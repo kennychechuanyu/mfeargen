@@ -1,0 +1,54 @@
+Package: mfeargen
+Type: Package
+Title: Bayesian Mixture Modeling for Fear Generalization Analysis
+Version: 1.0.0
+Date: 2025-11-09
+Maintainer: Kenny Yu <kenny.yu@kuleuven.be>
+Authors@R: c(
+    person("Kenny", "Yu",
+           email = "kenny.yu@kuleuven.be",
+           role = c("aut", "cre", "cph"),
+           comment = c(ORCID = "0000-0002-0665-9354")),
+    person("Francis", "Tuerlinckx",
+           role = "aut",
+           comment = c(ORCID = "0000-0002-1775-7654")),
+    person("Wolf", "Vanpaemel",
+           role = "aut",
+           comment = c(ORCID = "0000-0002-5855-3885")),
+    person("Jonas", "Zaman",
+           role = "aut",
+           comment = c(ORCID = "0000-0002-2218-3018"))
+    )
+Description: Provides a comprehensive Bayesian framework for analyzing fear
+    generalization data using latent mixture models. The package implements
+    a two-phase experimental paradigm (conditioning and generalization) and
+    identifies four distinct learning patterns: Non-Learners, Overgeneralizers,
+    Physical Generalizers, and Perceptual Generalizers. Key features include
+    parameter recovery analysis, perceptual noise modeling, automatic scale
+    detection, and extensive visualization tools. Based on the computational
+    model described in Yu et al. (2023) <doi:10.1038/s44271-023-00005-0>.
+    The model incorporates Rescorla-Wagner learning, Shepard's similarity-based
+    generalization, and hierarchical Bayesian inference to capture individual
+    differences in fear learning mechanisms.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.2
+Depends:
+    R (>= 4.0.0)
+Imports:
+    jagsUI (>= 1.5.0),
+    ggplot2 (>= 3.3.0),
+    dplyr,
+    stats,
+    utils
+Suggests:
+    rjags (>= 4.10),
+    coda (>= 0.19.0),
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown,
+    viridis
+SystemRequirements: JAGS (>= 4.3.0)
+URL: https://osf.io/sxjak/
+Contact: Kenny Yu <kenny.yu@kuleuven.be>

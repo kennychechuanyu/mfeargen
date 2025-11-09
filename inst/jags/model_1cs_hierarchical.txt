@@ -1,0 +1,177 @@
+model{
+  #======================================================================================================#
+  # THREE-LEVEL HIERARCHICAL MODEL FOR FEAR GENERALIZATION (1CS)
+  #
+  # Level 1: Population distributions (hyperparameters)
+  # Level 2: Individual stable components (between-person differences)  
+  # Level 3: Session-specific realizations (within-person variation)
+  #======================================================================================================#
+  
+  for (i in 1:Nparticipants){ # Participant loop
+    for (t in 1:Nsessions[i]){ # Session loop for participant i
+      for (j in 1:Ntrials[i,t]){ # Trial loop for session t
+        
+        #------------------------------------------------------------------------------------------------------------#
+        # 1. LIKELIHOOD
+        #------------------------------------------------------------------------------------------------------------#
+        y[i,t,j] ~ dnorm(theta[i,t,j], 1/sigma_obs[zn[i]]^2)
+        
+        #------------------------------------------------------------------------------------------------------------#
+        # 2. NON-LINEAR TRANSFORMATION (latent - observed scale)
+        #------------------------------------------------------------------------------------------------------------#
+        theta[i,t,j] <- A + (K-A) / (1 + exp(-(w0[i,t] + w1[i,t] * g[i,t,j])))
+        
+        #------------------------------------------------------------------------------------------------------------#
+        # 3. GENERALIZATION
+        #------------------------------------------------------------------------------------------------------------#
+        g[i,t,j] <- v[i,t,j] * s[i,t,j]
+        s[i,t,j] <- ifelse(v[i,t,j] > 0 && gp[i] > 1, 
+                          exp(-lambda[i,t] * ifelse(gp[i] == 3, d_phy[i,t,j], d_per[i,t,j])), 
+                          1) 
+        
+        #------------------------------------------------------------------------------------------------------------#
+        # 4. LEARNING
+        #------------------------------------------------------------------------------------------------------------#
+        v[i,t,j+1] <- ifelse(gp[i] != 1, 
+                            ifelse(k[i,t,j] == 1, 
+                                  v[i,t,j] + alpha[i,t] * (r[i,t,j] - v[i,t,j]), 
+                                  v[i,t,j]), 
+                            0)
+      } # End trial loop
+      
+      v[i,t,1] <- 0 # Initial excitatory associative strength for each session
+      
+      #------------------------------------------------------------------------------------------------------------#
+      # 5. LEVEL 3: SESSION-SPECIFIC PARAMETERS (Within-person variation)
+      #------------------------------------------------------------------------------------------------------------#
+      
+      # Session-specific realizations centered on individual stable values
+      alpha_raw[i,t] ~ dnorm(alpha_stable[i], 1/sigma_alpha_sq)
+      alpha[i,t] <- ifelse(gp[i] == 1, 0, alpha_raw[i,t])
+      
+      lambda_raw[i,t] ~ dnorm(lambda_stable[i], 1/sigma_lambda_sq)
+      lambda[i,t] <- ifelse(gp[i] == 1, 0, 
+                           ifelse(gp[i] == 2, max(0, min(lambda_raw[i,t], lambda_threshold)),
+                                  max(lambda_raw[i,t], lambda_threshold)))
+      
+      w0[i,t] ~ dnorm(w0_stable[i], 1/sigma_w0_sq)
+      
+      w1_raw[i,t] ~ dnorm(w1_stable[i], 1/sigma_w1_sq) T(0,)
+      w1[i,t] <- ifelse(gp[i] == 1, 0, w1_raw[i,t])
+      
+    } # End session loop
+    
+    #------------------------------------------------------------------------------------------------------------#
+    # 6. LEVEL 2: INDIVIDUAL STABLE COMPONENTS (Between-person differences)
+    #------------------------------------------------------------------------------------------------------------#
+    
+    # Stable learning rate (characteristic value for individual i)
+    alpha_stable_raw[i] ~ dnorm(mu_alpha, 1/tau_alpha_sq) T(0,1)
+    alpha_stable[i] <- ifelse(gp[i] == 1, 0, alpha_stable_raw[i])
+    
+    # Stable generalization parameter
+    lambda_stable_raw[i] ~ dnorm(mu_lambda, 1/tau_lambda_sq) T(0,)
+    lambda_stable[i] <- ifelse(gp[i] == 1, 0,
+                              ifelse(gp[i] == 2, min(lambda_stable_raw[i], lambda_threshold),
+                                     max(lambda_stable_raw[i], lambda_threshold)))
+    
+    # Stable response parameters
+    w0_stable[i] ~ dnorm(mu_w0, 1/tau_w0_sq)
+    w1_stable_raw[i] ~ dnorm(mu_w1, 1/tau_w1_sq) T(0,)
+    w1_stable[i] <- ifelse(gp[i] == 1, 0, w1_stable_raw[i])
+    
+    #------------------------------------------------------------------------------------------------------------#
+    # 7. LATENT GROUP INDICATORS
+    #------------------------------------------------------------------------------------------------------------#
+    # gp = 1: Non-learners (alpha = 0)
+    # gp = 2: Overgeneralizers (lambda < threshold)
+    # gp = 3: Physical generalizers (lambda > threshold, use physical distance)
+    # gp = 4: Perceptual generalizers (lambda > threshold, use perceptual distance)
+    
+    gp[i] ~ dcat(pi[1:4])
+    zn[i] <- ifelse(gp[i] == 1, 2, 1) # Variance group for non-learners vs others
+    
+  } # End participant loop
+  
+  #======================================================================================================#
+  # LEVEL 1: POPULATION-LEVEL HYPERPARAMETERS
+  #======================================================================================================#
+  
+  # Population means
+  mu_alpha ~ dbeta(alpha_a_pop, alpha_b_pop) T(0.01, 0.99)
+  mu_lambda ~ dlnorm(lambda_mu_pop, 1/lambda_sigma_pop^2)
+  mu_w0 ~ dnorm(w0_mu_pop, 1/w0_sigma_pop^2)
+  mu_w1 ~ dgamma(w1_a_pop, w1_b_pop) T(0.1,)
+  
+  # Between-person variance components (tau^2)
+  tau_alpha_sq ~ dgamma(2, 1) # Between-person variance in learning rates
+  tau_lambda_sq ~ dgamma(2, 1) # Between-person variance in generalization
+  tau_w0_sq ~ dgamma(2, 1) # Between-person variance in intercepts
+  tau_w1_sq ~ dgamma(2, 1) # Between-person variance in slopes
+  
+  # Within-person variance components (sigma^2)
+  sigma_alpha_sq ~ dgamma(2, 1) # Within-person variance in learning rates
+  sigma_lambda_sq ~ dgamma(2, 1) # Within-person variance in generalization
+  sigma_w0_sq ~ dgamma(2, 1) # Within-person variance in intercepts
+  sigma_w1_sq ~ dgamma(2, 1) # Within-person variance in slopes
+  
+  # Observation noise
+  sigma_obs[1] ~ dunif(0.1, 2) # Learners
+  sigma_obs[2] ~ dunif(1.5, 4) # Non-learners
+  
+  # Group probabilities
+  pi[1:4] ~ ddirch(pi_alpha[1:4])
+  
+  # Hyperpriors for population parameters
+  alpha_a_pop <- alpha_mu_hyper * alpha_kappa_hyper
+  alpha_b_pop <- (1 - alpha_mu_hyper) * alpha_kappa_hyper
+  alpha_mu_hyper ~ dbeta(1, 1)
+  alpha_kappa_hyper ~ dunif(1, 50)
+  
+  lambda_mu_pop ~ dnorm(0, 1/0.5^2)
+  lambda_sigma_pop ~ dunif(0.01, 1)
+  
+  w0_mu_pop ~ dnorm(0, 1/10^2)
+  w0_sigma_pop ~ dgamma(2, 1)
+  
+  w1_a_pop ~ dgamma(2, 1)
+  w1_b_pop ~ dgamma(2, 1)
+  
+  #======================================================================================================#
+  # DERIVED QUANTITIES: STABILITY METRICS
+  #======================================================================================================#
+  
+  # Calculate stability (ICC) for each parameter
+  # Stability = tau^2 / (tau^2 + sigma^2)
+  # Interpretation: proportion of variance due to stable individual differences
+  
+  stability_alpha <- tau_alpha_sq / (tau_alpha_sq + sigma_alpha_sq)
+  stability_lambda <- tau_lambda_sq / (tau_lambda_sq + sigma_lambda_sq)
+  stability_w0 <- tau_w0_sq / (tau_w0_sq + sigma_w0_sq)
+  stability_w1 <- tau_w1_sq / (tau_w1_sq + sigma_w1_sq)
+  
+  # Variance partitioning coefficients
+  vpc_between_alpha <- tau_alpha_sq / (tau_alpha_sq + sigma_alpha_sq)
+  vpc_within_alpha <- sigma_alpha_sq / (tau_alpha_sq + sigma_alpha_sq)
+  
+  vpc_between_lambda <- tau_lambda_sq / (tau_lambda_sq + sigma_lambda_sq)
+  vpc_within_lambda <- sigma_lambda_sq / (tau_lambda_sq + sigma_lambda_sq)
+  
+  #======================================================================================================#
+  # DATA REQUIREMENTS
+  #======================================================================================================#
+  # A: Minimum rating scale value
+  # K: Maximum rating scale value
+  # lambda_threshold: Criterion for distinguishing generalizer groups
+  # pi_alpha[1:4]: Prior for group probabilities (Dirichlet parameters)
+  # 
+  # Data arrays:
+  # y[i,t,j]: Observed ratings (participant i, session t, trial j)
+  # k[i,t,j]: Trial indicator (1 if trial exists, 0 otherwise)
+  # r[i,t,j]: US presence (0 or 1)
+  # d_phy[i,t,j]: Physical distance from CS+
+  # d_per[i,t,j]: Perceptual distance from CS+
+  # Nsessions[i]: Number of sessions for participant i
+  # Ntrials[i,t]: Number of trials in session t for participant i
+  #======================================================================================================#
+}

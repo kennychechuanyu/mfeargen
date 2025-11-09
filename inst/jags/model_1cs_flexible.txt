@@ -1,0 +1,96 @@
+model{
+   for (i in 1:Nparticipants){ # Participant loop start
+      for (j in 1:Ntrials){ # Trial loop start
+
+      # 1. Likelihood
+      #------------------------------------------------------------------------------------------------------------#
+      y[i,j] ~ dnorm(theta[i,j], 1/sigma[zn[i]]^2)
+      #------------------------------------------------------------------------------------------------------------#
+      
+      # 2. Non-linear transformation (latent - observed scale)
+      #------------------------------------------------------------------------------------------------------------#
+      theta[i,j] <- A + (K-A) / (1 + exp(-(w0[i] + w1[i] * g[i,j])))
+      #------------------------------------------------------------------------------------------------------------#
+
+      # 3. Generalization
+      #------------------------------------------------------------------------------------------------------------#
+      g[i,j] <- v[i,j] * s[i,j]
+      s[i,j] <- ifelse(v[i,j] > 0 && gp[i] > 1, exp(-lambda[i] * ifelse(gp[i] == 3, d_phy[i,j], d_per_old[i,j])), 1) 
+      #------------------------------------------------------------------------------------------------------------#
+
+      # 4. Learning
+      #------------------------------------------------------------------------------------------------------------#
+      v[i,j+1] <- ifelse(gp[i] != 1, ifelse(k[i,j] == 1, v[i,j] + alpha[i] * (r[i,j] - v[i,j]), v[i,j]), 0) # Excitatory associative strength
+
+    } # Trial loop end
+
+      v[i,1] <- 0 # The initial excitatory associative strength
+
+      #------------------------------------------------------------------------------------------------------------#
+
+      
+      # 6. Latent group indicators
+      #------------------------------------------------------------------------------------------------------------#
+      # gp = 1 - Non-learners : alpha = 0
+      # gp = 2 - Overgeneralizers : lambda = 0
+      # gp = 3 - Physical generalizers : lambda > 0, d_phy 
+      # gp = 4 - Perceptual generalizers : lambda > 0 , d_per
+
+      gp[i] ~ dcat(pi[]) # Latent groups - 1, 2, 3, 4
+      #------------------------------------------------------------------------------------------------------------#
+
+      
+      # 7. Priors
+      #------------------------------------------------------------------------------------------------------------#
+      lambda_1[i] ~ dnorm(lambda_mu, prior_lambda_mu_precision) T(lambda_threshold,)
+      lambda_2[i] ~ dnorm(lambda_mu, prior_lambda_mu_precision) T(0,lambda_threshold)
+      lambda[i] <- ifelse(gp[i] == 1, 0, ifelse(gp[i] == 2, lambda_2[i], lambda_1[i]))
+      w0[i] ~ dnorm(w0_mu, prior_w0_mu_precision)
+      w1_1[i] ~ dgamma(prior_w1_a_shape, prior_w1_a_rate) T(1,)
+      w1[i] <- ifelse(gp[i] == 1, 0, w1_1[i]) 
+      alpha_1[i] ~ dbeta(alpha_a, alpha_b) T(1e-9,1-1e-9)  # Learning rate
+      alpha[i] <- ifelse(gp[i] == 1, 0, alpha_1[i])
+      d_sigma[i] ~ dgamma(2,1) T(1e-9,)
+      zn[i] <- ifelse(gp[i] == 1, 2, 1)
+      #------------------------------------------------------------------------------------------------------------#
+
+    } # Participant loop end
+    
+      # 8. Hyperpriors 
+      #------------------------------------------------------------------------------------------------------------#
+      # Lambda hyperpriors - use data-provided parameters
+      lambda_mu ~ dlnorm(prior_lambda_mu_mean, prior_lambda_mu_precision)
+      lambda_sigma ~ dunif(prior_lambda_sigma_min, prior_lambda_sigma_max)
+      
+      # Alpha hyperpriors - use data-provided parameters
+      alpha_a <- alpha_mu * alpha_kappa
+      alpha_b <- (1 - alpha_mu) * alpha_kappa
+      alpha_mu ~ dbeta(prior_alpha_mu_a, prior_alpha_mu_b) T(1e-9,1-1e-9)
+      alpha_kappa ~ dunif(prior_alpha_kappa_min, prior_alpha_kappa_max)
+      
+      # Sigma priors - use data-provided parameters
+      sigma[1] ~ dunif(prior_sigma1_min, prior_sigma1_max)
+      sigma[2] ~ dunif(prior_sigma2_min, prior_sigma2_max)
+      
+      # Group probability prior - use data-provided parameters
+      pi[1:4] ~ ddirch(prior_pi_alpha[])
+      
+      # W1 hyperpriors - use data-provided parameters
+      w1_a ~ dgamma(prior_w1_a_shape, prior_w1_a_rate) T(1e-9,)
+      w1_b ~ dgamma(prior_w1_b_shape, prior_w1_b_rate) T(1e-9,)
+      
+      # W0 hyperpriors - use data-provided parameters
+      w0_mu ~ dnorm(prior_w0_mu_mean, prior_w0_mu_precision)
+      w0_sigma ~ dgamma(prior_w0_sigma_shape, prior_w0_sigma_rate)
+      #------------------------------------------------------------------------------------------------------------#
+      # A and K should be provided in the data list as rating_scale[1] and rating_scale[2]
+      A <- rating_scale[1]
+      K <- rating_scale[2]
+      
+      # Additional data preparation for JAGS compatibility
+      # These should be provided in the data list
+      # k[i,j] = trial indicator (1 if trial exists, 0 otherwise)
+      # r[i,j] = US presence (0 or 1)
+      # d_phy[i,j] = physical distance
+      # d_per_old[i,j] = perceptual distance
+    }

@@ -1,0 +1,43 @@
+citHeader("To cite mfeargen in publications use:")
+
+bibentry(
+  bibtype  = "Article",
+  title    = "Humans display interindividual differences in the latent mechanisms underlying fear generalization behaviour",
+  author   = c(
+    person("Kenny", "Yu"),
+    person("Francis", "Tuerlinckx"),
+    person("Wolf", "Vanpaemel"),
+    person("Jonas", "Zaman")
+  ),
+  journal  = "Communications Psychology",
+  year     = "2023",
+  volume   = "1",
+  pages    = "5",
+  doi      = "10.1038/s44271-023-00005-0",
+  url      = "https://doi.org/10.1038/s44271-023-00005-0",
+  textVersion = paste(
+    "Yu, K., Tuerlinckx, F., Vanpaemel, W., & Zaman, J. (2023).",
+    "Humans display interindividual differences in the latent mechanisms underlying fear generalization behaviour.",
+    "Communications Psychology, 1, 5.",
+    "https://doi.org/10.1038/s44271-023-00005-0"
+  )
+)
+
+bibentry(
+  bibtype  = "Manual",
+  title    = "mfeargen: Bayesian Mixture Modeling for Fear Generalization Analysis",
+  author   = c(
+    person("Kenny", "Yu"),
+    person("Francis", "Tuerlinckx"),
+    person("Wolf", "Vanpaemel"),
+    person("Jonas", "Zaman")
+  ),
+  year     = "2024",
+  note     = "R package version 1.0.0",
+  url      = "https://osf.io/sxjak/",
+  textVersion = paste(
+    "Yu, K., Tuerlinckx, F., Vanpaemel, W., & Zaman, J. (2024).",
+    "mfeargen: Bayesian Mixture Modeling for Fear Generalization Analysis.",
+    "R package version 1.0.0."
+  )
+)

@@ -1,0 +1,102 @@
+model{
+   for (i in 1:Nparticipants){ # Participant loop start
+      for (j in 1:Ntrials){ # Trial loop start
+
+      # 1. Likelihood
+      #------------------------------------------------------------------------------------------------------------#
+      y[i,j] ~ dnorm(theta[i,j], 1/sigma[zn[i]]^2)
+      #------------------------------------------------------------------------------------------------------------#
+      
+      # 2. Non-linear transformation (latent - observed scale)
+      #------------------------------------------------------------------------------------------------------------#
+      theta[i,j] <- A + (K-A) / (1 + exp(-(w0[i] + w1[i] * g[i,j])))
+      #------------------------------------------------------------------------------------------------------------#
+
+      # 3. Generalization
+      #------------------------------------------------------------------------------------------------------------#
+      g[i,j] <- v_plus[i,j] * s_plus[i,j] + v_minus[i,j] * s_minus[i,j]
+      s_plus[i,j] <- ifelse(v_plus[i,j] > 0 && gp[i] > 1, exp(-lambda[i] * ifelse(gp[i] == 4, d_p_per[i,j], d_p_phy[i,j])), 1) 
+      s_minus[i,j] <- ifelse(abs(v_minus[i,j]) > 0 && gp[i] > 1, exp(-lambda[i] * ifelse(gp[i] == 4, d_m_per[i,j], d_m_phy[i,j])), 1)
+
+      d_p_per[i,j] ~ dnorm(d_p_phy[i,j], 1/d_sigma[i]^2) T(0,) # Generate missing perceptual distance between CS+ and S
+      d_m_per[i,j] ~ dnorm(d_m_phy[i,j], 1/d_sigma[i]^2) T(0,) # Generate missing perceptual distance between CS- and S
+      #------------------------------------------------------------------------------------------------------------#
+
+      # 4. Learning
+      #------------------------------------------------------------------------------------------------------------#
+      v_plus[i,j+1] <- ifelse(gp[i] != 1, ifelse(k_plus[i,j] == 1, v_plus[i,j] + alpha[i] * (r_plus[i,j] - v_plus[i,j]), v_plus[i,j]), 0) # Excitatory associative strength
+      v_minus[i,j+1] <- ifelse(gp[i] != 1, ifelse(k_minus[i,j] == 1, v_minus[i,j] + alpha[i] * (r_minus[i,j] - v_minus[i,j]), v_minus[i,j]), 0) # Inhibitory associative strength
+      
+      
+      # log-likelihood
+      loglik[i,j] <- logdensity.norm(y[i,j], theta[i,j], 1/sigma[zn[i]]^2)
+
+      # Prediction
+      y_pre[i,j] ~ dnorm(theta[i,j], 1/sigma[zn[i]]^2)    
+
+
+    } # Trial loop end
+
+      v_plus[i,1] <- 0 # The initial excitatory associative strength
+      v_minus[i,1] <- 0 # The initial inhibitory associative strength
+      #------------------------------------------------------------------------------------------------------------#
+
+
+
+      
+      # 6. Latent group indicators
+      #------------------------------------------------------------------------------------------------------------#
+      # gp = 1 - Non-learners : alpha = 0
+      # gp = 2 - Overgeneralizers : lambda = 0
+      # gp = 3 - Perceptual generalizers : lambda > 0 , d_phy
+      # gp = 4 - Physical generalizers : lambda > 0, d_per 
+
+      gp[i] ~ dcat(pi[]) # Latent groups - 1, 2, 3, 4 
+      #------------------------------------------------------------------------------------------------------------#
+
+      
+      # 7. Priors
+      #------------------------------------------------------------------------------------------------------------#
+      lambda_1[i] ~ dnorm(lambda_mu, 1/lambda_sigma^2) T(lambda_threshold,)
+      lambda_2[i] ~ dnorm(lambda_mu, 1/lambda_sigma^2) T(0,lambda_threshold)
+      lambda[i] <- ifelse(gp[i] == 1, 0, ifelse(gp[i] == 2, lambda_2[i], lambda_1[i]))
+      w0[i] ~ dnorm(w0_mu, 1/w0_sigma^2)
+      w1_1[i] ~ dgamma(w1_a, w1_b) T(1,)
+      w1[i] <- ifelse(gp[i] == 1, 0, w1_1[i]) 
+      alpha_1[i] ~ dbeta(alpha_a, alpha_b) T(1e-9,1-1e-9)  # Learning rate
+      alpha[i] <- ifelse(gp[i] == 1, 0, alpha_1[i])
+      d_sigma[i] ~ dgamma(2,1) T(1e-9,)
+      zn[i] <- ifelse(gp[i] == 1, 2, 1)
+      #------------------------------------------------------------------------------------------------------------#
+
+    } # Participant loop end
+    
+      # 8. Hyperpriors 
+      #------------------------------------------------------------------------------------------------------------#
+      lambda_mu ~ dnorm(.1, 1) T(0,)
+      lambda_sigma ~ dunif(1e-9, 1)
+      alpha_a <- alpha_mu * alpha_kappa
+      alpha_b <- (1 - alpha_mu) * alpha_kappa
+      alpha_mu ~ dbeta(1,1) T(1e-9,1-1e-9)
+      alpha_kappa ~ dunif(1,10)   
+      sigma[1] ~ dunif(1e-9, 1.5)
+      sigma[2] ~ dunif(1.5, 3)
+      pi[1:4] ~ ddirch(c(1,1,1,1))
+      w1_a ~ dgamma(2,1) T(1e-9,)
+      w1_b ~ dgamma(2,1) T(1e-9,)
+      w0_mu ~ dnorm(0,1/10^2)
+      w0_sigma ~ dgamma(2,1)
+      #------------------------------------------------------------------------------------------------------------#
+      # A and K should be provided in the data list as rating_scale[1] and rating_scale[2]
+      A <- rating_scale[1]
+      K <- rating_scale[2]
+      
+      # Additional data preparation for JAGS compatibility
+      # These should be provided in the data list
+      # k_plus[i,j] = CS+ trial indicator (1 if CS+ trial, 0 otherwise)
+      # k_minus[i,j] = CS- trial indicator (1 if CS- trial, 0 otherwise)  
+      # r_plus[i,j] = US+ presence (0 or 1)
+      # r_minus[i,j] = US- presence (0 or 1, typically -1 for CS-)
+      # d_p_phy[i,j] = physical distance from CS+
+      # d_m_phy[i,j] = physical distance from CS-
+    }

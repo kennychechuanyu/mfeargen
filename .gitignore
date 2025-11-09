@@ -1,0 +1,64 @@
+# R specific
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj.user/
+*.Rcheck/
+*.Rcheck
+..Rcheck/
+
+# Build artifacts
+*.tar.gz
+*.zip
+/Meta/
+/doc/
+
+# Temporary files
+*.log
+*.out
+*~
+.DS_Store
+Thumbs.db
+nul
+
+# Development and test files
+test*.R
+TEST*.R
+*ANALYSIS*.R
+*FIX*.R
+*DEBUG*.R
+REBUILD*.R
+ROBUST*.R
+WORKING*.R
+replicate*.R
+debug*.R
+test_*.R
+quick_test.R
+
+# Data files in root (should be in data/ if needed)
+/*.rds
+/*.RData
+
+# PDF files in root
+/*.pdf
+
+# Reference scripts (non-standard)
+reference scripts/
+reference_scripts/
+
+# Documentation drafts
+*_SUMMARY.md
+*_DESIGN.md
+PACKAGE_*.md
+
+# IDE
+.vscode/
+.idea/
+
+# renv (if using)
+renv/
+renv.lock
+
+# Temporary demo files
+demo_plots/
