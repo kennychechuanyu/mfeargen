@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{mfeargen object}
 
-\item{type}{Character. Plot type: "diagnostic", "parameters", "groups", "gradient", or "all"}
+\item{type}{Character. Plot type: "diagnostic", "parameters", "groups", "gradient", "predictive", or "all"}
 
 \item{...}{Additional arguments passed to specific plot functions}
 }

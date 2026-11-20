@@ -10,7 +10,8 @@ prepare_mfeargen_data(
   lambda_criterion = 0.7,
   rating_scale = NULL,
   priors = NULL,
-  use_flexible_priors = FALSE
+  use_flexible_priors = FALSE,
+  observation_model = NULL
 )
 }
 \arguments{
@@ -19,7 +20,11 @@ reinforcement outcomes (US for 1cs; USp and signed USm for 2cs). USm=-1
 denotes an inhibitory target, 0 no target, and 1 an excitatory target.
 Supply stimulus_type, Phy_size and Per_size, or explicit trial indicators
 and distance columns. When phase is supplied, learning updates occur
-during conditioning only.}
+during conditioning only. The size shortcut uses the physical CS value
+as both references, so Phy_size and Per_size must share a coordinate system.
+For perceptual coordinates with a different origin, supply precomputed
+distances instead. Supply every column in an explicit indicator or
+distance set; partial sets are rejected.}
 
 \item{model_type}{Character. "1cs" or "2cs"}
 
@@ -32,6 +37,11 @@ scale explicitly when participants did not use its full range.}
 \item{priors}{Must be NULL; supply priors to fit_mfeargen instead.}
 
 \item{use_flexible_priors}{Must be FALSE; supply priors to fit_mfeargen instead.}
+
+\item{observation_model}{Either "normal" or "censored". If NULL, uses
+simulation metadata when present, otherwise "normal". Censored ratings
+must lie within rating_scale; normal observations may lie outside its
+bounds because those bounds specify the latent response transformation.}
 }
 \value{
 List formatted for JAGS

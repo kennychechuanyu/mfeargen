@@ -2,9 +2,19 @@
 % Please edit documentation in R/methods.R
 \name{predict.mfeargen}
 \alias{predict.mfeargen}
-\title{Predictions for fitted participants}
+\title{Predictions and Intervals for Fitted Trials}
 \usage{
-\method{predict}{mfeargen}(object, newdata = NULL, type = c("groups", "response"), ...)
+\method{predict}{mfeargen}(
+  object,
+  newdata = NULL,
+  type = c("groups", "response"),
+  interval = c("none", "credible", "prediction"),
+  level = 0.95,
+  format = c("matrix", "data.frame"),
+  scale = c("response", "normalized"),
+  seed = NULL,
+  ...
+)
 }
 \arguments{
 \item{object}{A fitted mfeargen model.}
@@ -13,11 +23,24 @@
 
 \item{type}{Either "groups" or "response".}
 
-\item{...}{Arguments passed to predict_groups or fitted.}
+\item{interval}{"none", "credible" for uncertainty in the expected response,
+or "prediction" for repeated ratings including observation noise.}
+
+\item{level}{Probability covered by the equal-tailed interval.}
+
+\item{format}{"matrix" or "data.frame". Intervals in matrix format return
+a participant by trial by statistic array. Data frames preserve input row
+order and include participant IDs, trial labels, observations, and estimates.}
+
+\item{scale}{"response" for original units, or "normalized" for 0-10.}
+
+\item{seed}{Optional seed for generating predictive ratings.}
+
+\item{...}{Arguments passed to predict_groups for group predictions.}
 }
 \value{
-Group assignments or posterior mean expected responses.
+Group assignments, expected ratings, or predictions and intervals.
 }
 \description{
-Predictions for fitted participants
+Predictions and Intervals for Fitted Trials
 }

@@ -21,8 +21,8 @@ get_strong_priors(
 A mfeargen_priors object
 }
 \description{
-Returns strongly informative priors based on typical values from
-fear generalization literature. Suitable when prior knowledge exists.
+Constructs priors around user-supplied expectations for learning and
+generalization rates. The confidence setting controls their concentration.
 }
 \examples{
 # Strong priors with default expectations

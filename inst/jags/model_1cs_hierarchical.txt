@@ -28,6 +28,8 @@ model {
       v[i,t,1] <- 0
       for (j in 1:Ntrials[i,t]) {
         y[i,t,j] ~ dnorm(theta[i,t,j], tau_obs[i])
+        loglik[i,t,j] <- logdensity.norm(y[i,t,j], theta[i,t,j], tau_obs[i])
+        y_pre[i,t,j] ~ dnorm(theta[i,t,j], tau_obs[i])
         theta[i,t,j] <- A + (K - A) * ilogit(w0[i,t] + w1[i,t] * g[i,t,j])
         distance[i,t,j] <- ifelse(gp[i] == 3, d_phy[i,t,j], d_per[i,t,j])
         g[i,t,j] <- v[i,t,j] * exp(-lambda[i,t] * distance[i,t,j])

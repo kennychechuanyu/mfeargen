@@ -16,7 +16,8 @@ simulate_participant(
   reinforcement_rate,
   model_type,
   rating_scale,
-  perceptual_noise_sd
+  perceptual_noise_sd,
+  observation_model = "censored"
 )
 }
 \description{

@@ -19,83 +19,136 @@ NULL
 #' data <- simulate_mfeargen(n_participants = 10)
 #' validate_mfeargen_data(data)
 validate_mfeargen_data <- function(data, model_type = NULL, verbose = TRUE) {
-  if (!is.data.frame(data) || nrow(data) == 0L) {
-    stop("data must be a non-empty data frame")
-  }
-  required <- c("participant", "trials", "US_expect")
-  missing <- setdiff(required, names(data))
-  if (length(missing)) stop("Missing required columns: ", paste(missing, collapse = ", "))
-  if (!(is.numeric(data$participant) || is.character(data$participant) ||
-        is.factor(data$participant)) || anyNA(data$participant) ||
-      any(!nzchar(as.character(data$participant)))) {
-    stop("participant must contain non-missing numeric or character identifiers")
-  }
-  if (is.numeric(data$participant) && any(!is.finite(data$participant))) {
-    stop("participant identifiers must be finite")
-  }
-  if (!is.numeric(data$trials) || anyNA(data$trials) ||
-      any(!is.finite(data$trials) | data$trials < 1 | data$trials != floor(data$trials))) {
-    stop("trials must contain positive integers")
-  }
-  if (anyDuplicated(data[c("participant", "trials")])) {
-    stop("Duplicate trial numbers within participant")
-  }
-  if (!is.numeric(data$US_expect) || any(is.infinite(data$US_expect))) {
-    stop("US_expect must be numeric, with finite values or NA")
-  }
-  if (any(vapply(split(data$US_expect, data$participant, drop = TRUE), function(x) all(is.na(x)), logical(1)))) {
-    stop("Each participant must have at least one observed US_expect rating")
-  }
-  if (is.null(model_type)) model_type <- if (all(c("USp", "USm") %in% names(data))) "2cs" else "1cs"
   if (is.null(model_type)) {
     model_type <- if (all(c("USp", "USm") %in% names(data))) "2cs" else "1cs"
   }
-  if (!is.null(model_type)) {
-    model_type <- match.arg(model_type, c("1cs", "2cs"))
-    outcomes <- if (model_type == "1cs") "US" else c("USp", "USm")
-    missing <- setdiff(outcomes, names(data))
-    if (length(missing)) stop("Missing required reinforcement columns: ", paste(missing, collapse = ", "))
-    for (column in outcomes) {
-      x <- data[[column]]
-      allowed <- if (column == "USm") c(-1, 0, 1) else c(0, 1)
-      if (!is.numeric(x) || anyNA(x) || any(!x %in% allowed)) {
-        stop(column, " must contain observed reinforcement outcomes coded ", paste(allowed, collapse = ", "))
-      }
+  model_type <- match.arg(model_type, c("1cs", "2cs"))
+  if (!is.logical(verbose) || length(verbose) != 1L || is.na(verbose)) {
+    stop("verbose must be TRUE or FALSE")
+  }
+  validate_trial_rows(data, model_type)
+  prepare_trial_covariates(data, model_type)
+  if (verbose) message("Data validation passed")
+  TRUE
+}
+
+validate_trial_rows <- function(data, model_type) {
+  if (!is.data.frame(data) || nrow(data) == 0L) {
+    stop("data must be a non-empty data frame")
+  }
+  if (anyDuplicated(names(data)) || anyNA(names(data)) || any(!nzchar(names(data)))) {
+    stop("data must have distinct, non-empty column names")
+  }
+  missing <- setdiff(c("participant", "trials", "US_expect"), names(data))
+  if (length(missing)) stop("Missing required columns: ", paste(missing, collapse = ", "))
+  ids <- data$participant
+  if (!(is.numeric(ids) || is.character(ids) || is.factor(ids)) ||
+      !is.null(dim(ids)) || anyNA(ids) || any(!nzchar(trimws(as.character(ids))))) {
+    stop("participant must contain non-missing numeric or character identifiers")
+  }
+  if (is.numeric(ids) && any(!is.finite(ids))) stop("participant identifiers must be finite")
+  if (!is.numeric(data$trials) || !is.null(dim(data$trials)) || anyNA(data$trials) ||
+      any(!is.finite(data$trials) | data$trials < 1 | data$trials != floor(data$trials))) {
+    stop("trials must contain positive integers")
+  }
+  if (anyDuplicated(data[c("participant", "trials")])) stop("Duplicate trial numbers within participant")
+  if (!is.numeric(data$US_expect) || !is.null(dim(data$US_expect)) || any(is.infinite(data$US_expect))) {
+    stop("US_expect must be numeric, with finite values or NA")
+  }
+  if (any(vapply(split(data$US_expect, ids, drop = TRUE), function(x) all(is.na(x)), logical(1)))) {
+    stop("Each participant must have at least one observed US_expect rating")
+  }
+  outcomes <- if (model_type == "1cs") "US" else c("USp", "USm")
+  missing <- setdiff(outcomes, names(data))
+  if (length(missing)) stop("Missing required reinforcement columns: ", paste(missing, collapse = ", "))
+  for (column in outcomes) {
+    x <- data[[column]]
+    allowed <- if (column == "USm") c(-1, 0, 1) else c(0, 1)
+    if (!(is.numeric(x) || is.logical(x)) || !is.null(dim(x)) || anyNA(x) || any(!x %in% allowed)) {
+      stop(column, " must contain observed reinforcement outcomes coded ", paste(allowed, collapse = ", "))
     }
   }
-  indicators <- if (model_type == "1cs") "k" else c("k_plus", "k_minus")
-  distances <- if (model_type == "1cs") c("d_phy", "d_per_old") else
-    c("d_p_phy", "d_m_phy", "d_p_per", "d_m_per")
-  if (all(distances %in% names(data))) {
-    for (column in distances) {
-      if (!is.numeric(data[[column]]) || any(!is.finite(data[[column]]) | data[[column]] < 0)) {
-        stop(column, " must contain finite, non-negative distances")
-      }
-    }
-  } else {
-    missing <- setdiff(c("Phy_size", "Per_size", "stimulus_type"), names(data))
-    if (length(missing)) stop("Missing required columns for stimulus distances: ", paste(missing, collapse = ", "))
-    for (column in c("Phy_size", "Per_size")) {
-      if (!is.numeric(data[[column]]) || any(!is.finite(data[[column]]))) {
-        stop(column, " must contain finite measurements; missing covariates cannot be inferred")
-      }
-    }
-  }
-  if (all(indicators %in% names(data))) {
-    for (column in indicators) {
-      if (!is.numeric(data[[column]]) || anyNA(data[[column]]) || any(!data[[column]] %in% c(0, 1))) {
-        stop(column, " must contain learning indicators coded 0 or 1")
-      }
-    }
-  } else if (!"stimulus_type" %in% names(data) || anyNA(data$stimulus_type)) {
-    stop("Provide non-missing stimulus_type labels or explicit learning indicators")
+  if ("stimulus_type" %in% names(data) &&
+      (anyNA(data$stimulus_type) || any(!data$stimulus_type %in% c("CS+", "CS-", "GS")))) {
+    stop("stimulus_type must contain 'CS+', 'CS-', or 'GS'")
   }
   if ("phase" %in% names(data) &&
       (anyNA(data$phase) || any(!data$phase %in% c("conditioning", "generalization")))) {
     stop("phase must contain 'conditioning' or 'generalization'")
   }
-  if (verbose) message("Data validation passed")
-  TRUE
+  invisible(TRUE)
+}
+
+prepare_trial_covariates <- function(data, model_type) {
+  indicators <- if (model_type == "1cs") "k" else c("k_plus", "k_minus")
+  distances <- if (model_type == "1cs") c("d_phy", "d_per_old") else {
+    c("d_p_phy", "d_m_phy", "d_p_per", "d_m_per")
+  }
+  for (columns in list(indicators, distances)) {
+    present <- columns %in% names(data)
+    if (any(present) && !all(present)) {
+      stop("Incomplete explicit trial columns; also supply: ", paste(columns[!present], collapse = ", "))
+    }
+  }
+  if (!all(indicators %in% names(data))) {
+    if (!"stimulus_type" %in% names(data)) {
+      stop("Provide stimulus_type ('CS+', 'CS-', 'GS') or explicit learning indicators: ",
+           paste(indicators, collapse = ", "))
+    }
+    data[[indicators[1]]] <- as.integer(data$stimulus_type == "CS+")
+    if (model_type == "2cs") data$k_minus <- as.integer(data$stimulus_type == "CS-")
+  }
+  for (column in indicators) {
+    x <- data[[column]]
+    if (!(is.numeric(x) || is.logical(x)) || !is.null(dim(x)) || anyNA(x) || any(!x %in% c(0, 1))) {
+      stop(column, " must contain learning indicators coded 0 or 1")
+    }
+  }
+  if (model_type == "2cs" && any(data$k_plus + data$k_minus > 1)) {
+    stop("k_plus and k_minus cannot both be 1 on the same trial")
+  }
+  if (!all(distances %in% names(data))) {
+    required <- c("Phy_size", "Per_size", "stimulus_type")
+    missing <- setdiff(required, names(data))
+    if (length(missing)) stop("Missing required columns for stimulus distances: ", paste(missing, collapse = ", "))
+    for (column in c("Phy_size", "Per_size")) {
+      x <- data[[column]]
+      if (!is.numeric(x) || !is.null(dim(x)) || any(!is.finite(x))) {
+        stop(column, " must contain finite measurements; missing covariates cannot be inferred")
+      }
+    }
+    reference <- function(rows, label) {
+      values <- unique(data$Phy_size[rows][data$stimulus_type[rows] == label])
+      if (length(values) != 1L) {
+        stop("Each participant needs exactly one physical reference for ", label,
+             "; provide explicit distance columns for other designs")
+      }
+      values
+    }
+    for (column in distances) data[[column]] <- numeric(nrow(data))
+    for (id in unique(data$participant)) {
+      rows <- which(data$participant == id)
+      cs_plus <- reference(rows, "CS+")
+      if (model_type == "1cs") {
+        data$d_phy[rows] <- abs(data$Phy_size[rows] - cs_plus)
+        data$d_per_old[rows] <- abs(data$Per_size[rows] - cs_plus)
+      } else {
+        cs_minus <- reference(rows, "CS-")
+        if (cs_plus == cs_minus) stop("CS+ and CS- references must differ")
+        data$d_p_phy[rows] <- abs(data$Phy_size[rows] - cs_plus)
+        data$d_m_phy[rows] <- abs(data$Phy_size[rows] - cs_minus)
+        data$d_p_per[rows] <- abs(data$Per_size[rows] - cs_plus)
+        data$d_m_per[rows] <- abs(data$Per_size[rows] - cs_minus)
+      }
+    }
+  }
+  for (column in distances) {
+    x <- data[[column]]
+    if (!is.numeric(x) || !is.null(dim(x)) || any(!is.finite(x)) || any(x < 0)) {
+      stop(column, " must contain finite, non-negative distances")
+    }
+  }
+  data
 }
 
 #' Prepare Data for JAGS Model
@@ -112,7 +165,11 @@ validate_mfeargen_data <- function(data, model_type = NULL, verbose = TRUE) {
 #'   denotes an inhibitory target, 0 no target, and 1 an excitatory target.
 #'   Supply stimulus_type, Phy_size and Per_size, or explicit trial indicators
 #'   and distance columns. When phase is supplied, learning updates occur
-#'   during conditioning only.
+#'   during conditioning only. The size shortcut uses the physical CS value
+#'   as both references, so Phy_size and Per_size must share a coordinate system.
+#'   For perceptual coordinates with a different origin, supply precomputed
+#'   distances instead. Supply every column in an explicit indicator or
+#'   distance set; partial sets are rejected.
 #' @param model_type Character. "1cs" or "2cs"
 #' @param lambda_criterion Numeric. Criterion for lambda threshold (default: 0.7)
 #' @param rating_scale Numeric vector c(min, max). Uses simulation metadata
@@ -120,6 +177,10 @@ validate_mfeargen_data <- function(data, model_type = NULL, verbose = TRUE) {
 #'   scale explicitly when participants did not use its full range.
 #' @param priors Must be NULL; supply priors to fit_mfeargen instead.
 #' @param use_flexible_priors Must be FALSE; supply priors to fit_mfeargen instead.
+#' @param observation_model Either "normal" or "censored". If NULL, uses
+#'   simulation metadata when present, otherwise "normal". Censored ratings
+#'   must lie within rating_scale; normal observations may lie outside its
+#'   bounds because those bounds specify the latent response transformation.
 #' @return List formatted for JAGS
 #' @export
 #' @examples
@@ -130,12 +191,14 @@ prepare_mfeargen_data <- function(data,
                                  lambda_criterion = 0.7,
                                  rating_scale = NULL,
                                  priors = NULL,
-                                 use_flexible_priors = FALSE) {
+                                 use_flexible_priors = FALSE,
+                                 observation_model = NULL) {
   model_type <- match.arg(model_type)
   if (!is.null(priors) || !identical(use_flexible_priors, FALSE)) {
     stop("Supply priors to fit_mfeargen(), not prepare_mfeargen_data()")
   }
-  validate_mfeargen_data(data, model_type, verbose = FALSE)
+  validate_trial_rows(data, model_type)
+  data <- prepare_trial_covariates(data, model_type)
   validate_scalar(lambda_criterion, "lambda_criterion", lower = 0, upper = 1,
                   lower_open = TRUE, upper_open = TRUE)
 
@@ -159,71 +222,17 @@ prepare_mfeargen_data <- function(data,
   if (is.null(rating_scale)) rating_scale <- attr(data, "rating_scale")
   if (is.null(rating_scale)) rating_scale <- detect_rating_scale(data$US_expect)
   validate_rating_scale(rating_scale)
-  if (any(data$US_expect < rating_scale[1] | data$US_expect > rating_scale[2], na.rm = TRUE)) {
-    stop("US_expect contains ratings outside rating_scale")
+  if (is.null(observation_model)) observation_model <- attr(data, "observation_model")
+  if (is.null(observation_model)) observation_model <- "normal"
+  observation_model <- match.arg(observation_model, c("normal", "censored"))
+  if (observation_model == "censored" &&
+      any(data$US_expect < rating_scale[1] | data$US_expect > rating_scale[2], na.rm = TRUE)) {
+    stop("US_expect contains censored ratings outside rating_scale")
   }
 
   indicators <- if (model_type == "1cs") "k" else c("k_plus", "k_minus")
   distances <- if (model_type == "1cs") c("d_phy", "d_per_old") else {
     c("d_p_phy", "d_m_phy", "d_p_per", "d_m_per")
-  }
-  explicit_indicators <- all(indicators %in% names(data))
-  explicit_distances <- all(distances %in% names(data))
-  if (!explicit_indicators) {
-    if (!"stimulus_type" %in% names(data) || anyNA(data$stimulus_type) ||
-        any(!data$stimulus_type %in% c("CS+", "CS-", "GS"))) {
-      stop("Provide stimulus_type ('CS+', 'CS-', 'GS') or explicit learning indicators: ",
-           paste(indicators, collapse = ", "))
-    }
-    data[[indicators[1]]] <- as.integer(data$stimulus_type == "CS+")
-    if (model_type == "2cs") data$k_minus <- as.integer(data$stimulus_type == "CS-")
-  }
-  for (column in indicators) {
-    if (!is.numeric(data[[column]]) || anyNA(data[[column]]) || any(!data[[column]] %in% c(0, 1))) {
-      stop(column, " must contain learning indicators coded 0 or 1")
-    }
-  }
-  if (model_type == "2cs" && any(data$k_plus + data$k_minus > 1)) {
-    stop("k_plus and k_minus cannot both be 1 on the same trial")
-  }
-
-  if (!explicit_distances) {
-    required <- c("Phy_size", "Per_size", "stimulus_type")
-    missing <- setdiff(required, names(data))
-    if (length(missing)) stop("Missing required columns for stimulus distances: ", paste(missing, collapse = ", "))
-    for (column in c("Phy_size", "Per_size")) {
-      if (!is.numeric(data[[column]]) || any(!is.finite(data[[column]]))) {
-        stop(column, " must contain finite measurements; missing covariates cannot be inferred")
-      }
-    }
-    reference <- function(rows, label) {
-      values <- unique(data$Phy_size[rows][data$stimulus_type[rows] == label])
-      if (length(values) != 1L) {
-        stop("Each participant needs exactly one physical reference for ", label,
-             "; provide explicit distance columns for other designs")
-      }
-      values
-    }
-    for (column in distances) data[[column]] <- numeric(nrow(data))
-    for (rows in participant_rows) {
-      cs_plus <- reference(rows, "CS+")
-      if (model_type == "1cs") {
-        data$d_phy[rows] <- abs(data$Phy_size[rows] - cs_plus)
-        data$d_per_old[rows] <- abs(data$Per_size[rows] - cs_plus)
-      } else {
-        cs_minus <- reference(rows, "CS-")
-        if (cs_plus == cs_minus) stop("CS+ and CS- references must differ")
-        data$d_p_phy[rows] <- abs(data$Phy_size[rows] - cs_plus)
-        data$d_m_phy[rows] <- abs(data$Phy_size[rows] - cs_minus)
-        data$d_p_per[rows] <- abs(data$Per_size[rows] - cs_plus)
-        data$d_m_per[rows] <- abs(data$Per_size[rows] - cs_minus)
-      }
-    }
-  }
-  for (column in distances) {
-    if (!is.numeric(data[[column]]) || any(!is.finite(data[[column]]) | data[[column]] < 0)) {
-      stop(column, " must contain finite, non-negative distances")
-    }
   }
   if ("phase" %in% names(data)) {
     for (column in indicators) data[[column]] <- data[[column]] * as.integer(data$phase == "conditioning")
@@ -232,8 +241,13 @@ prepare_mfeargen_data <- function(data,
   physical_columns <- if (model_type == "1cs") "d_phy" else c("d_p_phy", "d_m_phy")
   max_distance <- max(unlist(data[physical_columns], use.names = FALSE))
   if (max_distance <= 0) stop("At least one nonzero physical distance is required to define lambda_threshold")
+  normalized <- (data$US_expect - rating_scale[1]) / diff(rating_scale) * 10
+  observed <- !is.na(data$US_expect)
+  normalized[observed & data$US_expect == rating_scale[1]] <- 0
+  normalized[observed & data$US_expect == rating_scale[2]] <- 10
+  if (any(is.infinite(normalized))) stop("Normalized ratings overflow; rescale the response units")
   jags_data <- list(
-    y = to_matrix(10 * normalize_ratings(data$US_expect, rating_scale), NA_real_),
+    y = to_matrix(normalized, NA_real_),
     Nparticipants = n_participants,
     Ntrials = n_trials,
     lambda_threshold = calculate_lambda_threshold(max_distance, lambda_criterion),
@@ -252,6 +266,7 @@ prepare_mfeargen_data <- function(data,
   attr(jags_data, "observed") <- !is.na(jags_data$y)
   attr(jags_data, "model_type") <- model_type
   attr(jags_data, "rating_scale") <- rating_scale
+  attr(jags_data, "observation_model") <- observation_model
   jags_data
 }
 
@@ -276,6 +291,7 @@ detect_rating_scale <- function(responses, buffer = 0) {
   if (!length(responses)) stop("Cannot detect a rating scale without observed responses")
   scale <- range(responses) + c(-buffer, buffer)
   if (scale[1] == scale[2]) stop("Constant ratings require an explicit rating_scale")
+  validate_rating_scale(scale)
   scale
 }
 

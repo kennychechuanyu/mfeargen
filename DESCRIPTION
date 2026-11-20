@@ -1,7 +1,7 @@
 Package: mfeargen
 Type: Package
 Title: Bayesian Mixture Modeling for Fear Generalization Analysis
-Version: 1.0.1
+Version: 1.1.0
 Maintainer: Kenny Yu <kenny.yu@kuleuven.be>
 Authors@R: c(
     person("Kenny", "Yu",
@@ -35,6 +35,7 @@ Depends:
 Imports:
     jagsUI (>= 1.5.0),
     ggplot2 (>= 3.4.0),
+    posterior (>= 1.4.0),
     stats,
     utils
 Suggests:

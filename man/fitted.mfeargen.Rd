@@ -2,7 +2,7 @@
 % Please edit documentation in R/methods.R
 \name{fitted.mfeargen}
 \alias{fitted.mfeargen}
-\title{Posterior mean expected responses}
+\title{Posterior Mean Expected Ratings}
 \usage{
 \method{fitted}{mfeargen}(object, scale = c("response", "normalized"), ...)
 }
@@ -14,10 +14,10 @@
 \item{...}{Additional arguments (ignored).}
 }
 \value{
-A participant by trial matrix. Rows retain participant IDs; trailing
-padded trials are NA. Values are expectations from theta, not noisy
-posterior predictive draws.
+A participant by trial matrix retaining participant IDs and NA for
+padded trials. For censored models, these are the expectations of bounded
+ratings, integrating over observation noise as well as parameter uncertainty.
 }
 \description{
-Posterior mean expected responses
+Posterior Mean Expected Ratings
 }

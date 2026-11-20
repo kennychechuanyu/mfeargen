@@ -41,7 +41,8 @@ prior_normal <- function(mean = 0, sd = 1, truncate = NULL) {
   check_prior_number(mean, "mean")
   check_prior_number(sd, "sd", positive = TRUE)
   check_prior_truncation(truncate)
-  
+  check_prior_number(1 / sd^2, "normal precision", positive = TRUE)
+
   prior <- list(
     dist = "norm",
     mean = mean,
@@ -216,7 +217,8 @@ prior_lognormal <- function(meanlog = NULL, sdlog = NULL, mean = NULL, sd = NULL
   
   check_prior_number(meanlog, "meanlog")
   check_prior_number(sdlog, "sdlog", positive = TRUE)
-  
+  check_prior_number(1 / sdlog^2, "lognormal precision", positive = TRUE)
+
   prior <- list(
     dist = "lnorm",
     mean = meanlog,
@@ -281,6 +283,9 @@ prior_uniform <- function(min, max) {
 #' # Informative prior favoring first category
 #' prior_dirichlet(alpha = c(10, 2, 2, 2))
 prior_dirichlet <- function(alpha = NULL, concentration = NULL) {
+  if (!is.null(alpha) && !is.null(concentration)) {
+    stop("Specify alpha or concentration, not both")
+  }
   
   if (is.null(alpha)) {
     alpha <- concentration

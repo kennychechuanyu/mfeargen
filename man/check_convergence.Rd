@@ -2,20 +2,41 @@
 % Please edit documentation in R/03_model_fitting.R
 \name{check_convergence}
 \alias{check_convergence}
-\title{Check MCMC Convergence}
+\title{Check MCMC convergence and effective sample sizes}
 \usage{
-check_convergence(fit, threshold = 1.1, verbose = TRUE)
+check_convergence(
+  fit,
+  threshold = 1.01,
+  verbose = TRUE,
+  min_ess_per_chain = 100
+)
 }
 \arguments{
-\item{fit}{JAGS output object}
+\item{fit}{A fitted mfeargen model or JAGS output containing separate chains.}
 
-\item{threshold}{Numeric. Rhat threshold for convergence (default: 1.1)}
+\item{threshold}{Upper limit for rank-normalized split Rhat.}
 
-\item{verbose}{Logical. Print diagnostic messages}
+\item{verbose}{Print diagnostic messages.}
+
+\item{min_ess_per_chain}{Minimum bulk and tail effective sample sizes per chain.}
 }
 \value{
-List with convergence information
+A list with an overall status, a parameter-level diagnostic table,
+Rhat and effective sample size summaries. \code{converged = NA} means that the
+available draws cannot establish convergence, including single-chain runs.
 }
 \description{
-Checks convergence of MCMC chains using Rhat statistics.
+Check MCMC convergence and effective sample sizes
+}
+\details{
+Uses rank-normalized split and folded Rhat, bulk ESS, and tail ESS.
+Diagnostics exclude trial expectations, pointwise likelihoods and predictive
+draws. Structurally zero group-specific coefficients are listed separately;
+other constant parameters remain unassessed. Passing these diagnostics is
+necessary but does not establish model adequacy or rule out unexplored modes.
+}
+\references{
+Vehtari et al. (2021). Rank-normalization, folding, and
+localization: An improved Rhat for assessing convergence of MCMC.
+Bayesian Analysis, 16(2), 667-718. \doi{10.1214/20-BA1221}.
 }

@@ -2,26 +2,31 @@
 % Please edit documentation in R/03_model_fitting.R
 \name{extract_parameters}
 \alias{extract_parameters}
-\title{Extract Model Parameters}
+\title{Extract model parameters}
 \usage{
 extract_parameters(fit, parameter = "all", summary_only = TRUE)
 }
 \arguments{
-\item{fit}{mfeargen object or JAGS output}
+\item{fit}{A fitted mfeargen model or JAGS output.}
 
-\item{parameter}{Character. Which parameter to extract}
+\item{parameter}{One parameter name, or "all".}
 
-\item{summary_only}{Logical. Return summary statistics only}
+\item{summary_only}{Return posterior summaries when TRUE, or retained draws
+when FALSE.}
 }
 \value{
-Data frame or matrix of parameter values
+For one parameter, a data frame of posterior summaries with named
+parameter rows, or an array of retained draws. For "all", a named list of
+parameter blocks, with group membership when available. Existing mean,
+standard-deviation, and quantile components are retained for compatibility.
 }
 \description{
-Extracts posterior distributions of model parameters.
+Extract model parameters
 }
 \examples{
 \dontrun{
-fit <- fit_mfeargen(data)
-alpha_params <- extract_parameters(fit, "alpha")
+fit <- fit_mfeargen(simulate_mfeargen(n_participants = 8))
+extract_parameters(fit, "alpha")
+extract_parameters(fit, "alpha", summary_only = FALSE)
 }
 }

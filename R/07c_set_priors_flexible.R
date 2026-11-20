@@ -7,8 +7,8 @@ NULL
 #'
 #' @description
 #' Alternative to set_priors() that accepts prior distribution objects.
-#' This function provides a cleaner interface for users who want to use
-#' the new prior specification system.
+#' Unspecified hyperpriors use the package defaults. Each parameter accepts
+#' the distribution families listed below.
 #'
 #' @param lambda_mu Prior for lambda_mu (from prior_lognormal or prior_normal)
 #' @param lambda_sigma Prior for lambda_sigma (from prior_uniform)

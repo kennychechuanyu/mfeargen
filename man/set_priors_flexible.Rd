@@ -48,8 +48,8 @@ A mfeargen_priors object
 Alternative function for setting priors using prior objects
 
 Alternative to set_priors() that accepts prior distribution objects.
-This function provides a cleaner interface for users who want to use
-the new prior specification system.
+Unspecified hyperpriors use the package defaults. Each parameter accepts
+the distribution families listed below.
 }
 \examples{
 # Using prior objects

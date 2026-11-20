@@ -18,7 +18,8 @@ simulate_mfeargen(
   perceptual_noise_sd = 0.5,
   lambda_criterion = 0.7,
   seed = NULL,
-  return_true_params = FALSE
+  return_true_params = FALSE,
+  observation_model = c("censored", "normal")
 )
 }
 \arguments{
@@ -50,6 +51,10 @@ For 2cs, trials alternate between CS+ and CS-.}
 \item{seed}{Integer. Random seed for reproducibility}
 
 \item{return_true_params}{Logical. Return true parameters (default: FALSE)}
+
+\item{observation_model}{"censored" clips Gaussian observations to the
+instrument bounds; "normal" leaves Gaussian draws unbounded. The chosen
+model is stored as metadata for fit_mfeargen.}
 }
 \value{
 Data frame with simulated data. The true_parameters attribute, when
@@ -62,10 +67,11 @@ Generates simulated fear generalization data following the two-phase paradigm:
 }
 \details{
 Observation noise is shared by learners and separately by
-non-learners, matching the fitted model. Ratings are clipped to the
-requested scale to represent bounded measurements. The fitting likelihood
-uses an uncensored normal approximation, so recovery can be biased when
-many responses fall at the scale endpoints.
+non-learners. Censored observations use the scale endpoints for latent
+Gaussian draws outside the instrument range. Normal observations can fall
+outside rating_scale, whose bounds specify the sigmoid's asymptotes.
+Physical generalizers use physical distances; overgeneralizers and
+perceptual generalizers use perceptual distances, matching the fitted model.
 }
 \examples{
 # Basic simulation with default stimuli (1:10), CS+ at 5

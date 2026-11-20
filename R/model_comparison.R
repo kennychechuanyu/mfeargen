@@ -18,6 +18,10 @@ compare_models <- function(..., criterion = c("DIC", "WAIC")) {
       identical(x$rating_scale, reference$rating_scale)
   }, logical(1))
   if (!all(same_observations)) stop("Models must be fitted to the same observations and rating scale.")
+  observation_models <- vapply(models, function(x) response_model(x), character(1))
+  if (length(unique(observation_models)) != 1L) {
+    stop("Models must use the same observation_model; boundary probability masses and continuous densities are not interchangeable.")
+  }
   model_names <- names(models)
   if (is.null(model_names)) model_names <- rep("", length(models))
   expressions <- vapply(as.list(substitute(list(...)))[-1], deparse1, character(1))
@@ -87,7 +91,11 @@ calculate_waic <- function(fit_object) {
   pointwise <- -2 * (lppd - penalty)
   structure(list(waic = sum(pointwise), lppd = sum(lppd), p_waic = sum(penalty),
                  se_waic = if (length(pointwise) > 1L) sqrt(length(pointwise) * stats::var(pointwise)) else NA_real_,
-                 pointwise = pointwise, unit = "observed rating, conditional on participant effects"),
+                 pointwise = pointwise, n_observations = ncol(ll),
+                 n_high_variance = sum(penalty > 0.4),
+                 max_pointwise_variance = max(penalty),
+                 converged = isTRUE(fit_object$convergence$converged),
+                 unit = "observed rating, conditional on participant effects"),
             class = "mfeargen_waic")
 }
 
@@ -96,6 +104,8 @@ calculate_waic <- function(fit_object) {
 #' @param model_type Either "1cs" or "2cs".
 #' @param k_folds Number of rating folds.
 #' @param seed Optional integer seed for fold assignment and MCMC.
+#' @param keep_fits Retain each fold's full MCMC fit. Defaults to FALSE to avoid
+#'   storing several large posterior objects; held-out predictions are retained.
 #' @param ... Arguments passed to fit_mfeargen, including rating_scale.
 #' @return Fold fits, held-out log predictive densities and mean squared errors,
 #'   fold assignments, and aggregate summaries.
@@ -105,12 +115,13 @@ calculate_waic <- function(fit_object) {
 #'   for existing participants, not forecasts of future trials or new participants.
 #' @export
 cross_validate_mfeargen <- function(data, model_type = c("1cs", "2cs"),
-                                   k_folds = 10, seed = NULL, ...) {
+                                   k_folds = 10, seed = NULL, keep_fits = FALSE, ...) {
   model_type <- match.arg(model_type)
-  if (!is.data.frame(data) || !all(c("participant", "US_expect") %in% names(data))) {
-    stop("data must contain participant and US_expect columns.")
+  if (!is.logical(keep_fits) || length(keep_fits) != 1L || is.na(keep_fits)) {
+    stop("keep_fits must be TRUE or FALSE.")
   }
-  if (!is.numeric(k_folds) || length(k_folds) != 1L || !is.finite(k_folds) || k_folds < 2L || k_folds != as.integer(k_folds)) {
+  validate_mfeargen_data(data, model_type, verbose = FALSE)
+  if (!is.numeric(k_folds) || length(k_folds) != 1L || !is.finite(k_folds) || k_folds < 2L || k_folds > .Machine$integer.max || k_folds != floor(k_folds)) {
     stop("k_folds must be an integer of at least two.")
   }
   if (!is.null(seed)) {
@@ -164,15 +175,22 @@ cross_validate_mfeargen <- function(data, model_type = c("1cs", "2cs"),
     y <- (data$US_expect[rows] - bounds[1]) / diff(bounds) * 10
     log_density <- vapply(seq_along(rows), function(j) {
       sd <- sigma[cbind(seq_len(nrow(theta)), ifelse(gp[, ids[j]] == 1L, 2L, 1L))]
-      log_mean_exp(stats::dnorm(y[j], theta[, j], sd, log = TRUE)) + log(10 / diff(bounds))
+      log_density <- response_log_density(y[j], theta[, j], sd,
+                                           response_model(fit))
+      if ((response_model(fit)) == "normal" || (y[j] > 0 && y[j] < 10)) {
+        log_density <- log_density + log(10 / diff(bounds))
+      }
+      log_mean_exp(log_density)
     }, numeric(1))
-    predictions <- colMeans(theta) / 10 * diff(bounds) + bounds[1]
+    predictions <- as.vector(stats::fitted(fit))[cells]
     metrics[[k]] <- data.frame(fold = k, n_test = length(rows),
                               loglik_test = sum(log_density),
                               mse_test = mean((data$US_expect[rows] - predictions)^2),
                               converged = isTRUE(fit$convergence$converged))
-    fits[[k]] <- list(fold = k, fit = fit, test_rows = rows,
-                      predictions = predictions, log_predictive_density = log_density)
+    fits[[k]] <- list(fold = k, test_rows = rows,
+                      predictions = predictions, observations = data$US_expect[rows],
+                      log_predictive_density = log_density)
+    if (keep_fits) fits[[k]]$fit <- fit else rm(fit)
   }
   fold_metrics <- do.call(rbind, metrics)
   structure(list(fold_results = fits, fold_metrics = fold_metrics,
@@ -195,4 +213,44 @@ model_selection_advice <- function(comparison_result) {
   paste0(comparison_result$Model[1], " has the lowest ", criterion,
          "; the next model differs by ", round(delta, 2),
          ". Review convergence and predictive uncertainty before selecting a model.")
+}
+
+
+response_log_density <- function(value, location, sigma, observation_model) {
+  if (observation_model == "censored" && value <= 0) {
+    return(stats::pnorm(0, location, sigma, log.p = TRUE))
+  }
+  if (observation_model == "censored" && value >= 10) {
+    return(stats::pnorm(10, location, sigma, lower.tail = FALSE, log.p = TRUE))
+  }
+  stats::dnorm(value, location, sigma, log = TRUE)
+}
+
+#' Print Conditional WAIC
+#' @param x A value returned by calculate_waic.
+#' @param ... Additional arguments (ignored).
+#' @return The input, invisibly.
+#' @export
+print.mfeargen_waic <- function(x, ...) {
+  cat("Conditional trial-level WAIC:", round(x$waic, 2), "(SE", round(x$se_waic, 2), ")\n")
+  cat("Observed ratings:", x$n_observations, "; effective parameters:", round(x$p_waic, 2), "\n")
+  if (x$n_high_variance > 0) {
+    cat(x$n_high_variance, "ratings have log-likelihood variance above 0.4; consider held-out-rating validation.\n")
+  }
+  if (!isTRUE(x$converged)) cat("Convergence requires review before interpreting this criterion.\n")
+  invisible(x)
+}
+
+
+#' Print Held-Out-Rating Validation Results
+#' @param x An mfeargen_cv object.
+#' @param ... Additional arguments (ignored).
+#' @return The input, invisibly.
+#' @export
+print.mfeargen_cv <- function(x, ...) {
+  cat("Held-out-rating validation (", x$model_type, "; ", x$k_folds, " folds)\n", sep = "")
+  cat("Mean log predictive density:", round(x$summary$mean_loglik, 3), "\n")
+  cat("Mean squared error:", round(x$summary$mean_mse, 3), "\n")
+  cat("Folds passing sampling diagnostics:", sum(x$fold_metrics$converged), "of", x$k_folds, "\n")
+  invisible(x)
 }

@@ -9,7 +9,8 @@ utils::globalVariables(c(
   "..density..", "Count", "Recovered", "True", "US_expect",
   "alpha_recovered", "alpha_true", "count", "group", "group_label",
   "iteration", "label", "lambda_recovered", "lambda_true",
-  "participant", "stimulus", "value", "chain", "density", "probability"
+  "participant", "stimulus", "value", "chain", "density", "probability",
+  "statistic", "estimate", "observed", "lower", "upper", "predicted"
 ))
 
 #' Plot mfeargen Results
@@ -18,7 +19,7 @@ utils::globalVariables(c(
 #' Main plotting function for mfeargen objects. Creates diagnostic and result plots.
 #'
 #' @param x mfeargen object
-#' @param type Character. Plot type: "diagnostic", "parameters", "groups", "gradient", or "all"
+#' @param type Character. Plot type: "diagnostic", "parameters", "groups", "gradient", "predictive", or "all"
 #' @param ... Additional arguments passed to specific plot functions
 #' @return ggplot object or list of plots
 #' @export
@@ -32,7 +33,7 @@ utils::globalVariables(c(
 plot.mfeargen <- function(x, type = "diagnostic", ...) {
   
   type <- match.arg(type, c("diagnostic", "parameters", "groups", 
-                            "gradient", "recovery", "all"))
+                            "gradient", "predictive", "all"))
   
   if (type == "diagnostic") {
     return(plot_mcmc_diagnostics(x, ...))
@@ -42,14 +43,15 @@ plot.mfeargen <- function(x, type = "diagnostic", ...) {
     return(plot_group_probabilities(x, ...))
   } else if (type == "gradient") {
     return(plot_generalization_gradient(x, ...))
-  } else if (type == "recovery" && inherits(x, "mfeargen_recovery")) {
-    return(plot_parameter_recovery(x, ...))
+  } else if (type == "predictive") {
+    return(plot_posterior_predictive(x, ...))
   } else if (type == "all") {
     plots <- list(
       diagnostic = plot_mcmc_diagnostics(x, ...),
       parameters = plot_parameters(x, ...),
       groups = plot_group_probabilities(x, ...),
-      gradient = plot_generalization_gradient(x, ...)
+      gradient = plot_generalization_gradient(x, ...),
+      predictive = plot_posterior_predictive(x, ...)
     )
     return(plots)
   }
@@ -163,64 +165,62 @@ plot_parameters <- function(fit, parameter = "alpha") {
            y = if (length(param_values) > 1L) "Density" else "Participant") + theme_minimal()
 }
 
-#' Plot Generalization Gradient
+#' Plot Observed and Fitted Generalization Gradients
 #'
-#' @description Creates plot showing generalization gradient across stimuli
-#' @param fit mfeargen object
-#' @param group_separate Logical. Plot groups separately?
-#' @return ggplot object
+#' @param fit A fitted mfeargen model.
+#' @param group_separate Plot separate panels for posterior modal groups.
+#' @param level Credible interval width for the mean gradient.
+#' @return A ggplot object. Points are observed means; lines and ribbons summarize
+#'   the posterior expected mean of the same trial histories. Group panels use
+#'   modal assignments for display; consult group probabilities before interpreting
+#'   uncertain assignments. With phase labels, only generalization trials are used.
 #' @export
-plot_generalization_gradient <- function(fit, group_separate = TRUE) {
-  
-  if (!inherits(fit, "mfeargen")) {
-    stop("Input must be a mfeargen object")
+plot_generalization_gradient <- function(fit, group_separate = TRUE, level = 0.95) {
+  if (!inherits(fit, "mfeargen")) stop("fit must be a fitted mfeargen model.")
+  validate_scalar(level, "level", lower = 0, upper = 1, lower_open = TRUE, upper_open = TRUE)
+  if (!is.logical(group_separate) || length(group_separate) != 1L || is.na(group_separate)) {
+    stop("group_separate must be TRUE or FALSE.")
   }
-  
   data <- fit$data
+  data$.input_row <- seq_len(nrow(data))
   if ("phase" %in% names(data)) data <- data[data$phase == "generalization", , drop = FALSE]
-  if (!"stimulus" %in% names(data) && "Phy_size" %in% names(data)) data$stimulus <- data$Phy_size
-  
-  # Calculate mean response by stimulus
-  if (!"stimulus" %in% names(data)) {
-    warning("Stimulus column not found in data")
-    return(NULL)
+  if (!nrow(data)) stop("No generalization trials are available to plot.")
+  if ("Phy_size" %in% names(data)) data$stimulus <- data$Phy_size
+  if (!"stimulus" %in% names(data) || anyNA(data$stimulus)) {
+    stop("Provide stimulus or Phy_size values to plot a generalization gradient.")
   }
-  
-  gradient_data <- aggregate(US_expect ~ stimulus, data = data, mean)
-  
   membership <- fit$group_membership
-  has_membership <- !is.null(membership) &&
-    all(c("participant", "group_label") %in% names(membership))
-  
-  if (group_separate && has_membership) {
-    participant_lookup <- setNames(membership$group_label, membership$participant)
-    data$group_label <- participant_lookup[as.character(data$participant)]
-    
-    if (!any(!is.na(data$group_label))) {
-      warning("Group labels could not be matched to participants; plotting overall gradient instead.")
-    } else {
-      gradient_data <- aggregate(US_expect ~ stimulus + group_label, data = data, mean)
-      p <- ggplot(gradient_data, aes(x = stimulus, y = US_expect, color = group_label)) +
-        geom_line(linewidth = 1.2) +
-        geom_point(size = 3) +
-        scale_color_manual(values = c("#CC79A7", "#F0E442", "#56B4E9", "#D55E00")) +
-        labs(title = "Generalization Gradients by Group",
-             x = "Stimulus",
-             y = "Mean US Expectancy",
-             color = "Group") +
-        theme_minimal()
-      return(p)
-    }
-  }
-  
-  p <- ggplot(gradient_data, aes(x = stimulus, y = US_expect)) +
-    geom_line(linewidth = 1.2) +
-    geom_point(size = 3) +
-    labs(title = "Overall Generalization Gradient",
-         x = "Stimulus",
-         y = "Mean US Expectancy") +
-    theme_minimal()
-  return(p)
+  if (group_separate) {
+    if (is.null(membership)) stop("Group membership is unavailable for this fit.")
+    data$group_label <- membership$group_label[match(data$participant, membership$participant)]
+  } else data$group_label <- "All participants"
+  map <- attr(fit$jags_data, "row_index")
+  if (is.null(map)) stop("Trial-row mappings are unavailable; refit the model.")
+  cells <- match(data$.input_row, as.vector(map))
+  if (anyNA(cells) || anyNA(data$group_label)) stop("Trial or participant mappings could not be matched.")
+  draws <- posterior_response_draws(fit)
+  predictions <- matrix(draws, nrow = dim(draws)[1])[, cells, drop = FALSE]
+  grouping <- interaction(data$stimulus, data$group_label, drop = TRUE, lex.order = TRUE)
+  tail <- (1 - level) / 2
+  rows <- lapply(split(seq_len(nrow(data)), grouping), function(index) {
+    predicted <- rowMeans(predictions[, index, drop = FALSE])
+    interval <- stats::quantile(predicted, c(tail, 1 - tail))
+    observed <- data$US_expect[index]
+    data.frame(stimulus = data$stimulus[index[1]], group_label = data$group_label[index[1]],
+               observed = if (any(!is.na(observed))) mean(observed, na.rm = TRUE) else NA_real_,
+               predicted = mean(predicted), lower = interval[1], upper = interval[2], row.names = NULL)
+  })
+  plot_data <- do.call(rbind, rows)
+  line_data <- plot_data[stats::ave(seq_len(nrow(plot_data)), plot_data$group_label, FUN = length) > 1L, , drop = FALSE]
+  p <- ggplot(plot_data, aes(x = stimulus, group = group_label)) +
+    geom_ribbon(data = line_data, aes(ymin = lower, ymax = upper), fill = "#56B4E9", alpha = 0.25) +
+    geom_line(data = line_data, aes(y = predicted), color = "#0072B2", linewidth = 0.9) +
+    geom_point(aes(y = predicted), color = "#0072B2", size = 1.5) +
+    geom_point(aes(y = observed), na.rm = TRUE, size = 2) +
+    labs(title = "Generalization gradients", x = "Stimulus", y = "US expectancy",
+         subtitle = "Points: observed means; line and interval: expected response") + theme_minimal()
+  if (group_separate) p <- p + facet_wrap(~ group_label)
+  p
 }
 
 #' Plot Parameter Recovery
@@ -255,7 +255,7 @@ plot_parameter_recovery <- function(recovery,
   
   # Lambda recovery
   if ("lambda" %in% parameters && all(c("lambda_true", "lambda_recovered") %in% names(data))) {
-    lambda_data <- subset(data, group > 2)  # Exclude non-learners
+    lambda_data <- subset(data, group != 1)  # Exclude non-learners
     
     plots$lambda <- ggplot(lambda_data, aes(x = lambda_true, y = lambda_recovered)) +
       geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +

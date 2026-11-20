@@ -2,20 +2,25 @@
 % Please edit documentation in R/methods.R
 \name{coef.mfeargen}
 \alias{coef.mfeargen}
-\title{Extract posterior coefficient summaries}
+\title{Extract Posterior Coefficient Summaries}
 \usage{
-\method{coef}{mfeargen}(object, ...)
+\method{coef}{mfeargen}(object, scale = c("response", "normalized"), ...)
 }
 \arguments{
 \item{object}{A fitted mfeargen model.}
 
+\item{scale}{"response" expresses observation noise in original rating units;
+"normalized" keeps it on the internal 0-10 scale. Other parameters retain
+their model units in both cases.}
+
 \item{...}{Additional arguments (ignored).}
 }
 \value{
-A data frame with parameter names, posterior means, standard
-deviations, and 95 percent credible intervals. Standard deviations describe
-posterior uncertainty, rather than frequentist standard errors.
+A data frame with parameter names, participant IDs where applicable,
+group components, posterior means, posterior standard deviations, and 95
+percent credible intervals. Posterior standard deviations describe parameter
+uncertainty rather than frequentist standard errors.
 }
 \description{
-Extract posterior coefficient summaries
+Extract Posterior Coefficient Summaries
 }

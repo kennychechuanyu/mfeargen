@@ -9,6 +9,7 @@ cross_validate_mfeargen(
   model_type = c("1cs", "2cs"),
   k_folds = 10,
   seed = NULL,
+  keep_fits = FALSE,
   ...
 )
 }
@@ -20,6 +21,9 @@ cross_validate_mfeargen(
 \item{k_folds}{Number of rating folds.}
 
 \item{seed}{Optional integer seed for fold assignment and MCMC.}
+
+\item{keep_fits}{Retain each fold's full MCMC fit. Defaults to FALSE to avoid
+storing several large posterior objects; held-out predictions are retained.}
 
 \item{...}{Arguments passed to fit_mfeargen, including rating_scale.}
 }

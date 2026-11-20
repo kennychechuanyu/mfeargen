@@ -2,18 +2,23 @@
 % Please edit documentation in R/05_plotting.R
 \name{plot_generalization_gradient}
 \alias{plot_generalization_gradient}
-\title{Plot Generalization Gradient}
+\title{Plot Observed and Fitted Generalization Gradients}
 \usage{
-plot_generalization_gradient(fit, group_separate = TRUE)
+plot_generalization_gradient(fit, group_separate = TRUE, level = 0.95)
 }
 \arguments{
-\item{fit}{mfeargen object}
+\item{fit}{A fitted mfeargen model.}
 
-\item{group_separate}{Logical. Plot groups separately?}
+\item{group_separate}{Plot separate panels for posterior modal groups.}
+
+\item{level}{Credible interval width for the mean gradient.}
 }
 \value{
-ggplot object
+A ggplot object. Points are observed means; lines and ribbons summarize
+the posterior expected mean of the same trial histories. Group panels use
+modal assignments for display; consult group probabilities before interpreting
+uncertain assignments. With phase labels, only generalization trials are used.
 }
 \description{
-Creates plot showing generalization gradient across stimuli
+Plot Observed and Fitted Generalization Gradients
 }

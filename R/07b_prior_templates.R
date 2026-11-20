@@ -63,8 +63,8 @@ get_weak_priors <- function(model_type = "1cs") {
 #' Get Strongly Informative Priors
 #'
 #' @description
-#' Returns strongly informative priors based on typical values from
-#' fear generalization literature. Suitable when prior knowledge exists.
+#' Constructs priors around user-supplied expectations for learning and
+#' generalization rates. The confidence setting controls their concentration.
 #'
 #' @param expected_alpha Numeric. Expected learning rate (default: 0.5)
 #' @param expected_lambda Numeric. Expected generalization parameter (default: 0.1)

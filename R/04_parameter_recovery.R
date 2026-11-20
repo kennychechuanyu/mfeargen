@@ -19,7 +19,10 @@ NULL
 #' @param simulation_args Named list of additional arguments to simulate_mfeargen.
 #' @param ... Additional arguments to fit_mfeargen, such as parallel = FALSE.
 #'
-#' @return mfeargen_recovery object containing recovery results
+#' @return A mfeargen_recovery object containing true and recovered parameters,
+#'   RMSE, correlations and 95 percent posterior interval coverage. Learning-rate
+#'   and generalization-rate metrics exclude simulated non-learners. A single
+#'   run describes one simulated dataset, not repeated-sampling performance.
 #' @export
 #' @examples
 #' \dontrun{
@@ -38,6 +41,9 @@ run_parameter_recovery <- function(
   ...
 ) {
   
+  if (!is.logical(verbose) || length(verbose) != 1L || is.na(verbose)) {
+    stop("verbose must be TRUE or FALSE")
+  }
   if (verbose) message("Starting parameter recovery analysis...")
   
   # Generate simulated data
@@ -47,6 +53,7 @@ run_parameter_recovery <- function(
     stop("simulation_args must be a named list")
   }
   reserved <- c("n_participants", "model_type", "return_true_params", "seed")
+  if (anyDuplicated(names(simulation_args))) stop("simulation_args must have distinct names")
   if (any(names(simulation_args) %in% reserved)) {
     stop("Set n_participants, model_type and seed directly, not in simulation_args")
   }
@@ -114,6 +121,10 @@ extract_recovered_parameters <- function(fit, true_params) {
     values <- estimates[[parameter]]
     if (is.null(values)) stop("Missing posterior parameter: ", parameter)
     recovered[[paste0(parameter, "_recovered")]] <- as.vector(values)
+    lower <- fit$jags_fit$q2.5[[parameter]]
+    upper <- fit$jags_fit$q97.5[[parameter]]
+    recovered[[paste0(parameter, "_lower")]] <- as.vector(lower)
+    recovered[[paste0(parameter, "_upper")]] <- as.vector(upper)
   }
   membership <- predict_groups(fit, threshold = 0)
   recovered$group_recovered <- membership$group[match(ids, membership$participant)]
@@ -133,11 +144,19 @@ calculate_recovery_metrics <- function(true_params, recovered_params) {
     estimate <- combined[[paste0(parameter, "_recovered")]]
     valid <- is.finite(truth) & is.finite(estimate)
     if (parameter == "alpha") valid <- valid & combined$group != 1L
-    if (parameter == "lambda") valid <- valid & combined$group > 2L
+    if (parameter == "lambda") valid <- valid & combined$group != 1L
     metrics[[paste0(parameter, "_correlation")]] <- if (sum(valid) > 2L &&
         stats::sd(truth[valid]) > 0 && stats::sd(estimate[valid]) > 0) {
       stats::cor(truth[valid], estimate[valid])
     } else NA_real_
+    lower <- combined[[paste0(parameter, "_lower")]]
+    upper <- combined[[paste0(parameter, "_upper")]]
+    if (!is.null(lower) && !is.null(upper)) {
+      interval_valid <- valid & is.finite(lower) & is.finite(upper)
+      metrics[[paste0(parameter, "_coverage_95")]] <- if (any(interval_valid)) {
+        mean(truth[interval_valid] >= lower[interval_valid] & truth[interval_valid] <= upper[interval_valid])
+      } else NA_real_
+    }
     metrics[[paste0(parameter, "_rmse")]] <- if (any(valid)) {
       sqrt(mean((truth[valid] - estimate[valid])^2))
     } else NA_real_

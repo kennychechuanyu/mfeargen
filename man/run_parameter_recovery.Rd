@@ -36,7 +36,10 @@ run_parameter_recovery(
 \item{...}{Additional arguments to fit_mfeargen, such as parallel = FALSE.}
 }
 \value{
-mfeargen_recovery object containing recovery results
+A mfeargen_recovery object containing true and recovered parameters,
+RMSE, correlations and 95 percent posterior interval coverage. Learning-rate
+and generalization-rate metrics exclude simulated non-learners. A single
+run describes one simulated dataset, not repeated-sampling performance.
 }
 \description{
 Simulates data with known parameters and attempts to recover them
