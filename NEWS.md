@@ -1,3 +1,17 @@
+# mfeargen 1.1.0
+
+* Model ratings clipped to instrument endpoints with a censored Gaussian
+  likelihood; simulation records its observation model for consistent fitting.
+* Add response intervals, posterior predictive draws, and original-row prediction
+  tables for export, including missing ratings and repeated sessions.
+* Check chain mixing with rank-normalized split Rhat and bulk and tail effective
+  sample sizes; distinguish unavailable diagnostics from passing checks.
+* Plot fitted gradients and posterior predictive discrepancies alongside the
+  observations.
+* Validate complete prepared-data mappings and reject ambiguous input columns.
+* Include a CSV analysis example that saves estimates, diagnostics, predictions,
+  plots, and the fitted model.
+
 # mfeargen 1.0.1
 
 * Repair simulation, data preparation, and JAGS fitting for single-cue and

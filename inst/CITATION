@@ -33,11 +33,11 @@ bibentry(
     person("Jonas", "Zaman")
   ),
   year     = "2026",
-  note     = "R package version 1.0.1",
+  note     = paste("R package version", meta$Version),
   url      = "https://github.com/kennychechuanyu/mfeargen",
   textVersion = paste(
     "Yu, K., Tuerlinckx, F., Vanpaemel, W., & Zaman, J. (2026).",
     "mfeargen: Bayesian Mixture Modeling for Fear Generalization Analysis.",
-    "R package version 1.0.1."
+    paste0("R package version ", meta$Version, ".")
   )
 )
