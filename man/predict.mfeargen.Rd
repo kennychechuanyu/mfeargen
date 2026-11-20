@@ -2,22 +2,22 @@
 % Please edit documentation in R/methods.R
 \name{predict.mfeargen}
 \alias{predict.mfeargen}
-\title{Predict Method for mfeargen Objects}
+\title{Predictions for fitted participants}
 \usage{
-\method{predict}{mfeargen}(object, newdata = NULL, type = "groups", ...)
+\method{predict}{mfeargen}(object, newdata = NULL, type = c("groups", "response"), ...)
 }
 \arguments{
-\item{object}{A mfeargen object}
+\item{object}{A fitted mfeargen model.}
 
-\item{newdata}{Optional new data for prediction}
+\item{newdata}{Reserved for future use; must be NULL.}
 
-\item{type}{Character. Type of prediction ("groups", "response")}
+\item{type}{Either "groups" or "response".}
 
-\item{...}{Additional arguments}
+\item{...}{Arguments passed to predict_groups or fitted.}
 }
 \value{
-Predictions based on type
+Group assignments or posterior mean expected responses.
 }
 \description{
-Predict Method for mfeargen Objects
+Predictions for fitted participants
 }

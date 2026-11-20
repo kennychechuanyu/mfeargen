@@ -2,18 +2,20 @@
 % Please edit documentation in R/methods.R
 \name{logLik.mfeargen}
 \alias{logLik.mfeargen}
-\title{Log-likelihood Method for mfeargen Objects}
+\title{Posterior mean conditional log likelihood}
 \usage{
 \method{logLik}{mfeargen}(object, ...)
 }
 \arguments{
-\item{object}{A mfeargen object}
+\item{object}{A fitted mfeargen model.}
 
-\item{...}{Additional arguments (ignored)}
+\item{...}{Additional arguments (ignored).}
 }
 \value{
-Log-likelihood value
+A logLik object. The parameter count is unavailable for this mixture
+model, so df is NA; use calculate_waic for predictive comparison.
+The likelihood is evaluated on the internal 0-10 rating scale.
 }
 \description{
-Log-likelihood Method for mfeargen Objects
+Posterior mean conditional log likelihood
 }

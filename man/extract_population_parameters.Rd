@@ -2,11 +2,11 @@
 % Please edit documentation in R/08b_hierarchical_fitting.R
 \name{extract_population_parameters}
 \alias{extract_population_parameters}
-\title{Extract Population Parameters}
+\title{Extract Population Means}
 \usage{
 extract_population_parameters(jags_fit)
 }
 \description{
-Extract Population Parameters
+Extract Population Means
 }
 \keyword{internal}

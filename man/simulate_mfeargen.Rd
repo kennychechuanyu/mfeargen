@@ -30,7 +30,8 @@ simulate_mfeargen(
 
 \item{cs_minus}{Numeric. CS- stimulus value for 2cs (default: 3)}
 
-\item{n_conditioning_trials}{Integer. CS+ trials in conditioning (default: 24)}
+\item{n_conditioning_trials}{Integer. Total conditioning trials (default: 24).
+For 2cs, trials alternate between CS+ and CS-.}
 
 \item{n_generalization_trials}{Integer. Trials per stimulus in test (default: 16)}
 
@@ -51,12 +52,20 @@ simulate_mfeargen(
 \item{return_true_params}{Logical. Return true parameters (default: FALSE)}
 }
 \value{
-Data frame with simulated data
+Data frame with simulated data. The true_parameters attribute, when
+requested, records observation standard deviations in the original units.
 }
 \description{
 Generates simulated fear generalization data following the two-phase paradigm:
 (1) Conditioning phase with reinforcement learning
 (2) Generalization test phase without reinforcement
+}
+\details{
+Observation noise is shared by learners and separately by
+non-learners, matching the fitted model. Ratings are clipped to the
+requested scale to represent bounded measurements. The fitting likelihood
+uses an uncensored normal approximation, so recovery can be biased when
+many responses fall at the scale endpoints.
 }
 \examples{
 # Basic simulation with default stimuli (1:10), CS+ at 5

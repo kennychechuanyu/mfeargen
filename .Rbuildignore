@@ -3,40 +3,24 @@
 ^\.github$
 ^\.git$
 ^\.gitignore$
-^LICENSE\.md$
 ^README\.Rmd$
 ^cran-comments\.md$
-^NEWS\.md$
 ^CRAN-SUBMISSION\.md$
 ^_pkgdown\.yml$
 ^docs$
 ^pkgdown$
 ^codecov\.yml$
-^\.travis\.yml$
-^appveyor\.yml$
 ^\.Rhistory$
 ^\.RData$
 ^\.DS_Store$
 ^renv$
 ^renv\.lock$
-
-# Development files
 ^.*\.log$
 ^.*\.out$
-^test.*\.R$
-^TEST.*\.R$
-^.*ANALYSIS.*\.R$
-^.*FIX.*\.R$
-^.*DEBUG.*\.R$
-^examples/.*\.R$
-
-# Build artifacts
 ^.*\.tar\.gz$
 ^.*\.zip$
 ^.*\.Rcheck$
 ^\.\.Rcheck$
-
-# Reference data (original datasets not included in package build)
 ^reference$
 ^data-raw$
 ^demo_plots$

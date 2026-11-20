@@ -16,6 +16,8 @@ fit_mfeargen(
   prepared_data = NULL,
   parallel = TRUE,
   verbose = TRUE,
+  rating_scale = NULL,
+  seed = NULL,
   ...
 )
 }
@@ -42,15 +44,22 @@ fit_mfeargen(
 
 \item{verbose}{Logical. Print progress messages (default: TRUE)}
 
+\item{rating_scale}{Numeric vector c(min, max). Known response scale bounds.
+If omitted, uses simulation metadata or the observed range.}
+
+\item{seed}{Integer. Optional seed for initialization and sampling.}
+
 \item{...}{Additional arguments passed to jagsUI}
 }
 \value{
 mfeargen object containing:
-  - jags_fit: MCMC output from JAGS
-  - model_type: Model specification used
-  - data: Original data
-  - convergence: Convergence diagnostics
-  - group_membership: Predicted group assignments
+\itemize{
+\item jags_fit: MCMC output from JAGS
+\item model_type: Model specification used
+\item data: Original data
+\item convergence: Convergence diagnostics
+\item group_membership: Predicted group assignments
+}
 }
 \description{
 Fits a Bayesian mixture model to fear generalization data using JAGS.

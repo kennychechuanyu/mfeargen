@@ -5,88 +5,51 @@
 \alias{exp2_data}
 \title{Experiment 2 Data from Yu et al. (2023)}
 \format{
-A data frame with 7,200 observations and 24 variables:
+A data frame with 7,200 rows and 24 variables:
 \describe{
-  \item{participant}{Participant identifier (numeric, 1-40)}
-  \item{trials}{Trial number within participant}
-  \item{d_phy_m}{Physical distance from CS+m (more physically prototypical)}
-  \item{d_phy_p}{Physical distance from CS+p (more perceptually prototypical)}
-  \item{d_per_m}{Perceptual distance from CS+m}
-  \item{d_per_p}{Perceptual distance from CS+p}
-  \item{block_number}{Experimental block number}
-  \item{trial_number}{Trial number within block}
-  \item{US}{US presence indicator (0 = absent, 1 = present)}
-  \item{startle_circle}{Startle probe during stimulus presentation (0/1)}
-  \item{startle_iti}{Startle probe during inter-trial interval (0/1)}
-  \item{per_size}{Perceptual size of stimulus (MDS-derived)}
-  \item{us_expect}{US expectancy rating (0-10 scale, NA for ITI trials)}
-  \item{total_trial_nr}{Total trial number across experiment}
-  \item{group}{Experimental group assignment}
-  \item{stimulus}{Stimulus label (CS+, CS-, or generalization stimuli)}
-  \item{stimulus_phy}{Physical stimulus identifier (S1-S10)}
-  \item{csp_trials}{Indicator for CS+p trials}
-  \item{csm_trials}{Indicator for CS+m trials}
-  \item{us_p}{US presence for CS+p (1 = present, 0 = absent, -1 = other trial)}
-  \item{us_m}{US presence for CS+m (1 = present, 0 = absent, -1 = other trial)}
-  \item{cs_phy_p}{Physical size of CS+p stimulus}
-  \item{cs_phy_m}{Physical size of CS+m stimulus}
-  \item{phy_size}{Physical size of presented stimulus}
+\item{participant}{Participant identifier, 1-40.}
+\item{trials}{Trial order within participant.}
+\item{d_phy_m, d_phy_p}{Physical distances from CS- and CS+, respectively.}
+\item{d_per_m, d_per_p}{Perceptual distances from CS- and CS+, respectively.}
+\item{block_number, trial_number}{Experimental block and trial within block.}
+\item{US}{Observed aversive outcome, 0 or 1.}
+\item{startle_circle, startle_iti}{Startle probe indicators during stimulus
+presentation and the inter-trial interval.}
+\item{per_size}{Perceptual stimulus measurement.}
+\item{us_expect}{US expectancy rating on the original 0-10 scale.}
+\item{total_trial_nr}{Trial number across the experiment.}
+\item{group}{Experimental group assignment.}
+\item{stimulus, stimulus_phy}{Stimulus label and physical stimulus identifier.}
+\item{csp_trials, csm_trials}{CS+ and CS- trial indicators, respectively.}
+\item{us_p}{Excitatory learning target: 0 or 1.}
+\item{us_m}{Inhibitory learning target: -1 on CS- trials and 0 otherwise.}
+\item{cs_phy_p, cs_phy_m}{Physical CS+ and CS- reference values.}
+\item{phy_size}{Physical value of the presented stimulus.}
 }
 }
 \source{
 Yu, K., Tuerlinckx, F., Vanpaemel, W., & Zaman, J. (2023).
-  A multi-fidelity computational approach to understand human fear learning.
-  \emph{Communications Psychology}, \emph{1}(1), 5.
+Humans display interindividual differences in the latent mechanisms
+underlying fear generalization behaviour. \emph{Communications Psychology}, 1, 5.
+\doi{10.1038/s44271-023-00005-0}
 }
 \usage{
 exp2_data
 }
 \description{
-Fear generalization data from Experiment 2 of Yu et al. (2023), which used
-a two CS+ design (2CS). Participants underwent conditioning with two distinct
-CS+ stimuli: one close to the perceptual prototype (CS+p) and one close to
-the physical prototype (CS+m). This design allows assessment of whether
-generalization is based on physical or perceptual similarity.
+Trial-level data from the differential conditioning experiment in
+Yu et al. (2023), with CS+ and CS- cues and distances from each cue.
 }
 \details{
-This experiment used a 2CS design to distinguish between physical and perceptual
-generalization patterns. Two CS+ stimuli were reinforced: CS+p (perceptually
-prototypical) and CS+m (physically prototypical). Generalization stimuli varied
-systematically in both physical and perceptual space.
+\code{us_m = -1} is an inhibitory target, not a missing-value code.
+The stored data retain a legacy \code{design} attribute reading
+\code{"Two CS+ design (2CS)"}; the cue indicators and outcomes identify the
+CS+/CS- design described here. The raw dataset is preserved unchanged.
 
-The dual distance metrics (\code{d_phy_m}/\code{d_phy_p} and
-\code{d_per_m}/\code{d_per_p}) allow assessment of whether participants
-generalize based on physical similarity, perceptual similarity, or both.
-
-NA values in \code{us_expect} and distance variables occur during inter-trial
-intervals (ITI) when no stimulus was presented.
+Use \code{\link[=replicate_paper_analysis]{replicate_paper_analysis()}} for the supported reanalysis workflow.
 }
 \examples{
-\dontrun{
-# Load the data
 data(exp2_data)
-
-# View structure
-str(exp2_data)
-
-# Number of participants
-length(unique(exp2_data$participant))
-
-# Prepare for analysis
-# (Rename columns to match expected format)
-exp2_data$US_expect <- exp2_data$us_expect
-exp2_data$Per_size <- exp2_data$per_size
-exp2_data$Phy_size <- exp2_data$phy_size
-exp2_data$USp <- exp2_data$us_p
-exp2_data$USm <- exp2_data$us_m
-
-model_data <- prepare_mfeargen_data(
-  data = exp2_data,
-  model_type = "2cs"
-)
-}
-}
-\references{
-\doi{10.1038/s44271-023-00005-0}
+with(exp2_data, table(us_m, csm_trials))
 }
 \keyword{datasets}

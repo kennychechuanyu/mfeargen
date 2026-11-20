@@ -9,7 +9,7 @@ NULL
 #' Returns weakly informative priors that provide minimal constraint
 #' while ensuring computational stability. Suitable for exploratory analyses.
 #'
-#' @param model_type Character. "1cs" or "2cs" (affects group probability priors)
+#' @param model_type Character. "1cs" or "2cs". Both use the same template.
 #' @return A mfeargen_priors object
 #' @export
 #' @examples
@@ -21,7 +21,8 @@ NULL
 #' fit <- fit_mfeargen(data, priors = get_weak_priors())
 #' }
 get_weak_priors <- function(model_type = "1cs") {
-  
+  model_type <- match.arg(model_type, c("1cs", "2cs"))
+
   set_priors(
     # Lambda: weakly informative on log scale
     lambda_mu_mean = 0,
@@ -86,13 +87,9 @@ get_strong_priors <- function(expected_alpha = 0.5,
   
   confidence <- match.arg(confidence)
   
-  # Set concentration based on confidence
-  concentration <- switch(confidence,
-    low = 5,
-    medium = 10,
-    high = 20
-  )
-  
+  validate_scalar(expected_alpha, "expected_alpha", 0, 1, lower_open = TRUE, upper_open = TRUE)
+  validate_scalar(expected_lambda, "expected_lambda", 0, lower_open = TRUE)
+
   # Calculate beta parameters for alpha_mu hyperprior
   # These control the distribution of the mean learning rate
   # More conservative values to avoid numerical issues
@@ -172,7 +169,7 @@ get_strong_priors <- function(expected_alpha = 0.5,
 get_skeptical_priors <- function() {
   
   set_priors(
-    # Lambda: favor small values (little generalization)
+    # Lambda: favor broad generalization (small decay rates).
     lambda_mu_mean = log(0.01),
     lambda_mu_sd = 0.5,
     lambda_sigma_min = 1e-9,
@@ -292,11 +289,6 @@ compare_prior_templates <- function(templates = c("weak", "strong", "skeptical")
       stop("Unknown template: ", template)
     )
   }
-  
-  # Extract key parameters for comparison
-  params <- c("lambda_mu$mean", "lambda_mu$precision", 
-              "alpha_mu$a", "alpha_mu$b",
-              "pi$alpha", "sigma1$min", "sigma1$max")
   
   comparison <- data.frame(
     Parameter = c("lambda_mu_mean", "lambda_mu_sd", 

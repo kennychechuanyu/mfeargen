@@ -2,18 +2,22 @@
 % Please edit documentation in R/methods.R
 \name{fitted.mfeargen}
 \alias{fitted.mfeargen}
-\title{Fitted Values Method for mfeargen Objects}
+\title{Posterior mean expected responses}
 \usage{
-\method{fitted}{mfeargen}(object, ...)
+\method{fitted}{mfeargen}(object, scale = c("response", "normalized"), ...)
 }
 \arguments{
-\item{object}{A mfeargen object}
+\item{object}{A fitted mfeargen model.}
 
-\item{...}{Additional arguments (ignored)}
+\item{scale}{"response" for the original rating scale, or "normalized" for 0-10.}
+
+\item{...}{Additional arguments (ignored).}
 }
 \value{
-Matrix of fitted values
+A participant by trial matrix. Rows retain participant IDs; trailing
+padded trials are NA. Values are expectations from theta, not noisy
+posterior predictive draws.
 }
 \description{
-Fitted Values Method for mfeargen Objects
+Posterior mean expected responses
 }

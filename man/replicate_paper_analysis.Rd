@@ -2,11 +2,11 @@
 % Please edit documentation in R/paper_replication.R
 \name{replicate_paper_analysis}
 \alias{replicate_paper_analysis}
-\title{Replicate Analysis from Yu et al. (2023)}
+\title{Reanalyze the bundled study data}
 \usage{
 replicate_paper_analysis(
   experiment = c("exp1", "exp2"),
-  model_type_paper = TRUE,
+  model_type_paper = FALSE,
   cs_reference = c("csm", "csp"),
   n_chains = 3,
   n_iter = 10000,
@@ -16,100 +16,30 @@ replicate_paper_analysis(
 )
 }
 \arguments{
-\item{experiment}{Character string specifying which experiment to replicate.
-Options are \code{"exp1"} (single CS+ design) or \code{"exp2"}
-(two CS+ design). Default is \code{"exp1"}.}
+\item{experiment}{Either "exp1" or "exp2".}
 
-\item{model_type_paper}{Logical indicating whether to use the exact JAGS
-model from the paper. If \code{TRUE} (default), uses the original model
-specifications. If \code{FALSE}, uses the package's current model
-implementation. Default is \code{TRUE}.}
+\item{model_type_paper}{Must be FALSE. TRUE requests an unsupported exact
+replication and raises an error before sampling.}
 
-\item{cs_reference}{For Experiment 2 only. Character string specifying
-which CS+ to use as reference: \code{"csm"} (physically prototypical)
-or \code{"csp"} (perceptually prototypical). Default is \code{"csm"}.}
+\item{cs_reference}{The historical argument; only "csm" is supported.
+The 2cs model jointly uses both cue histories, so switching a single
+reference is not a separate analysis.}
 
-\item{n_chains}{Number of MCMC chains. Default is 3 (as in paper).}
+\item{n_chains}{Number of chains.}
 
-\item{n_iter}{Number of iterations per chain. Default is 10000 (as in paper).}
+\item{n_iter}{Iterations per chain.}
 
-\item{n_burnin}{Number of burn-in iterations. Default is 5000 (as in paper).}
+\item{n_burnin}{Burn-in iterations.}
 
-\item{n_thin}{Thinning interval. Default is 2 (as in paper).}
+\item{n_thin}{Thinning interval.}
 
-\item{...}{Additional arguments passed to \code{\link{fit_mfeargen}}.}
+\item{...}{Additional arguments to fit_mfeargen; priors and rating_scale
+may override the published hyperpriors and 1-10 rating bounds.}
 }
 \value{
-An object of class \code{mfeargen} containing:
-  \itemize{
-    \item \code{mcmc}: MCMC samples from posterior distributions
-    \item \code{data}: Prepared data used for fitting
-    \item \code{priors}: Prior distributions used
-    \item \code{model_type}: Model specification used
-    \item \code{convergence}: Convergence diagnostics
-  }
+A fitted mfeargen model with reanalysis metadata.
 }
 \description{
-Wrapper function to replicate the exact analysis pipeline from
-Yu et al. (2023). This function loads the appropriate experimental data,
-applies the paper's priors, and fits the model with the same settings
-used in the original publication.
-}
-\details{
-This function is designed to make it easy to replicate the exact analyses
-from Yu et al. (2023). It handles:
-\enumerate{
-  \item Loading the appropriate experimental dataset
-  \item Setting up the exact priors used in the paper
-  \item Preparing data in the correct format
-  \item Running MCMC with the same settings as the paper
-}
-
-For Experiment 1, the analysis uses a single CS+ design with one distance
-metric. For Experiment 2, you can choose to analyze generalization from
-either CS+m (physically prototypical) or CS+p (perceptually prototypical).
-
-\strong{Computational Note:} The full analysis can take 1-2 hours depending
-on your system. For testing purposes, consider reducing \code{n_iter} and
-\code{n_burnin}.
-}
-\examples{
-\dontrun{
-# Replicate Experiment 1 analysis (this will take time!)
-fit_exp1 <- replicate_paper_analysis(
-  experiment = "exp1",
-  n_chains = 3,
-  n_iter = 10000
-)
-
-# View results
-print(fit_exp1)
-plot(fit_exp1)
-
-# Replicate Experiment 2 analysis using CS+m as reference
-fit_exp2 <- replicate_paper_analysis(
-  experiment = "exp2",
-  cs_reference = "csm",
-  n_chains = 3,
-  n_iter = 10000
-)
-
-# Quick test run with fewer iterations
-fit_test <- replicate_paper_analysis(
-  experiment = "exp1",
-  n_chains = 2,
-  n_iter = 1000,
-  n_burnin = 500
-)
-}
-}
-\references{
-Yu, K., Tuerlinckx, F., Vanpaemel, W., & Zaman, J. (2023).
-  A multi-fidelity computational approach to understand human fear learning.
-  \emph{Communications Psychology}, \emph{1}(1), 5.
-  \doi{10.1038/s44271-023-00005-0}
-}
-\seealso{
-\code{\link{load_paper_data}}, \code{\link{get_paper_priors}},
-\code{\link{fit_mfeargen}}, \code{\link{prepare_mfeargen_data}}
+Fits the package's current model to the bundled trial data.
+Exact replication of the archived publication model is not available.
 }

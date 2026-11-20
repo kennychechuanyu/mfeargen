@@ -2,21 +2,23 @@
 % Please edit documentation in R/08_hierarchical_model.R
 \name{calculate_stability}
 \alias{calculate_stability}
-\title{Calculate Parameter Stability}
+\title{Summarize a Parameter's Variance Ratio}
 \usage{
 calculate_stability(fit, parameter, credible_interval = 0.95)
 }
 \arguments{
-\item{fit}{mfeargen_hierarchical object}
+\item{fit}{An \code{mfeargen_hierarchical} object.}
 
-\item{parameter}{Character. Parameter name ("alpha", "lambda", "w0", "w1")}
+\item{parameter}{One of \code{"alpha"}, \code{"lambda"}, \code{"w0"}, or \code{"w1"}.}
 
-\item{credible_interval}{Numeric. Credible interval width (default: 0.95)}
+\item{credible_interval}{Credible interval width between zero and one.}
 }
 \value{
-List with stability metrics and credible intervals
+An \code{mfeargen_stability} list with posterior summaries and draws.
+The ratio refers to the underlying normal distributions, before parameter
+constraints. The labels Low, Moderate, and High use descriptive cutoffs of
+0.3 and 0.7; they are not evidence of a psychological trait.
 }
 \description{
-Calculates stability metrics for model parameters, quantifying the proportion
-of variance attributable to stable individual differences vs. session variation.
+Summarize a Parameter's Variance Ratio
 }

@@ -2,15 +2,15 @@
 % Please edit documentation in R/08b_hierarchical_fitting.R
 \name{print.mfeargen_hierarchical}
 \alias{print.mfeargen_hierarchical}
-\title{S3 Print Method for Hierarchical Model}
+\title{Print a Repeated-Session Model}
 \usage{
 \method{print}{mfeargen_hierarchical}(x, ...)
 }
 \arguments{
-\item{x}{A mfeargen_hierarchical object}
+\item{x}{An \code{mfeargen_hierarchical} object.}
 
-\item{...}{Additional arguments (not used)}
+\item{...}{Unused.}
 }
 \description{
-S3 Print Method for Hierarchical Model
+Print a Repeated-Session Model
 }

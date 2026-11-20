@@ -2,22 +2,37 @@
 % Please edit documentation in R/model_comparison.R
 \name{cross_validate_mfeargen}
 \alias{cross_validate_mfeargen}
-\title{Cross-Validation for mfeargen Models}
+\title{Cross-validate held-out ratings within participants}
 \usage{
-cross_validate_mfeargen(data, model_type, k_folds = 10, ...)
+cross_validate_mfeargen(
+  data,
+  model_type = c("1cs", "2cs"),
+  k_folds = 10,
+  seed = NULL,
+  ...
+)
 }
 \arguments{
-\item{data}{Data frame with fear generalization data}
+\item{data}{A trial-level data frame accepted by fit_mfeargen.}
 
-\item{model_type}{Character. Either "1cs" or "2cs"}
+\item{model_type}{Either "1cs" or "2cs".}
 
-\item{k_folds}{Integer. Number of folds for cross-validation (default: 10)}
+\item{k_folds}{Number of rating folds.}
 
-\item{...}{Additional arguments passed to fit_mfeargen}
+\item{seed}{Optional integer seed for fold assignment and MCMC.}
+
+\item{...}{Arguments passed to fit_mfeargen, including rating_scale.}
 }
 \value{
-List with cross-validation results
+Fold fits, held-out log predictive densities and mean squared errors,
+fold assignments, and aggregate summaries.
 }
 \description{
-Performs leave-one-out cross-validation
+Cross-validate held-out ratings within participants
+}
+\details{
+Ratings are randomly held out within each participant; all stimulus
+and reinforcement histories remain available. Each fold refits the model
+with its held-out ratings set to NA. This evaluates missing-rating prediction
+for existing participants, not forecasts of future trials or new participants.
 }

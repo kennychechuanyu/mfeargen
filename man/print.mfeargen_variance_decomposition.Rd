@@ -2,15 +2,15 @@
 % Please edit documentation in R/08_hierarchical_model.R
 \name{print.mfeargen_variance_decomposition}
 \alias{print.mfeargen_variance_decomposition}
-\title{S3 Print Method for Variance Decomposition}
+\title{Print Variance Components}
 \usage{
 \method{print}{mfeargen_variance_decomposition}(x, ...)
 }
 \arguments{
-\item{x}{A mfeargen_variance_decomposition object}
+\item{x}{An \code{mfeargen_variance_decomposition} object.}
 
-\item{...}{Additional arguments (not used)}
+\item{...}{Unused.}
 }
 \description{
-S3 Print Method for Variance Decomposition
+Print Variance Components
 }

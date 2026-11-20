@@ -9,7 +9,7 @@ utils::globalVariables(c(
   "..density..", "Count", "Recovered", "True", "US_expect",
   "alpha_recovered", "alpha_true", "count", "group", "group_label",
   "iteration", "label", "lambda_recovered", "lambda_true",
-  "participant", "stimulus", "value"
+  "participant", "stimulus", "value", "chain", "density", "probability"
 ))
 
 #' Plot mfeargen Results
@@ -68,47 +68,25 @@ plot_mcmc_diagnostics <- function(fit, parameters = c("alpha", "lambda")) {
     stop("Input must be a mfeargen object")
   }
   
-  # Extract MCMC samples
-  mcmc_output <- fit$jags_fit
-  
-  # Create trace plots
-  plot_data <- data.frame()
-  
-  for (param in parameters) {
-    if (param %in% names(mcmc_output$sims.list)) {
-      samples <- mcmc_output$sims.list[[param]]
-      
-      # Sample a few participants for clarity
-      n_show <- min(5, ncol(samples))
-      
-      for (i in 1:n_show) {
-        plot_data <- rbind(plot_data, data.frame(
-          iteration = 1:nrow(samples),
-          value = samples[, i],
-          parameter = param,
-          participant = i
-        ))
-      }
+  chains <- fit$jags_fit$samples
+  if (is.null(chains)) stop("Chain samples are unavailable for this fit.")
+  plot_data <- list()
+  for (chain in seq_along(chains)) {
+    samples <- as.matrix(chains[[chain]])
+    columns <- colnames(samples)
+    keep <- columns[vapply(columns, function(nm) {
+      any(vapply(parameters, function(p) nm == p || startsWith(nm, paste0(p, "[")), logical(1)))
+    }, logical(1))]
+    for (nm in utils::head(keep, 10L)) {
+      plot_data[[length(plot_data) + 1L]] <- data.frame(
+        iteration = as.numeric(stats::time(chains[[chain]])), value = samples[, nm],
+        parameter = nm, chain = factor(chain))
     }
   }
-  
-  if (nrow(plot_data) == 0) {
-    warning("No data to plot")
-    return(NULL)
-  }
-  
-  # Create trace plot
-  p <- ggplot(plot_data, aes(x = iteration, y = value, color = factor(participant))) +
-    geom_line(alpha = 0.7) +
-    facet_wrap(~ parameter, scales = "free_y") +
-    labs(title = "MCMC Trace Plots",
-         x = "Iteration",
-         y = "Parameter Value",
-         color = "Participant") +
-    theme_minimal() +
-    theme(legend.position = "bottom")
-  
-  return(p)
+  if (!length(plot_data)) stop("None of the requested parameters were monitored.")
+  ggplot(do.call(rbind, plot_data), aes(x = iteration, y = value, color = chain)) +
+    geom_line(alpha = 0.7) + facet_wrap(~ parameter, scales = "free_y") +
+    labs(title = "MCMC traces", x = "Iteration", y = "Value", color = "Chain") + theme_minimal()
 }
 
 #' Plot Group Probabilities
@@ -123,48 +101,26 @@ plot_group_probabilities <- function(fit) {
     stop("Input must be a mfeargen object")
   }
   
-  if (is.null(fit$group_membership)) {
-    warning("No group membership data found")
-    return(NULL)
-  }
-  
-  # Get group counts - ensure all 4 groups are represented
-  if ("group" %in% names(fit$group_membership)) {
-    group_counts <- table(factor(fit$group_membership$group, levels = 1:4))
-  } else if ("assigned_group" %in% names(fit$group_membership)) {
-    # Map group labels to numbers
-    group_map <- c("Non-Learner" = 1, "Overgeneralizer" = 2, "Physical" = 3, "Perceptual" = 4)
-    group_nums <- group_map[fit$group_membership$assigned_group]
-    group_counts <- table(factor(group_nums, levels = 1:4))
-  } else {
-    # Default if no group info
-    group_counts <- rep(0, 4)
-  }
-  
-  group_data <- data.frame(
-    group = factor(1:4),
-    count = as.numeric(group_counts),
-    label = c("Non-Learner", "Overgeneralizer", "Physical", "Perceptual")
-  )
-  
-  # Create bar plot
-  p <- ggplot(group_data, aes(x = label, y = count, fill = label)) +
-    geom_bar(stat = "identity") +
-    geom_text(aes(label = count), vjust = -0.5) +
+  membership <- extract_group_membership(fit$jags_fit,
+                                         attr(fit$jags_data, "participants"))
+  probabilities <- as.matrix(membership[paste0("prob_group_", 1:4)])
+  labels <- get_group_labels(FALSE)
+  plot_data <- data.frame(
+    participant = factor(rep(as.character(membership$participant), times = 4),
+                         levels = as.character(membership$participant)),
+    group_label = factor(rep(labels, each = nrow(membership)), levels = labels),
+    probability = as.vector(probabilities))
+  ggplot(plot_data, aes(x = participant, y = probability, fill = group_label)) +
+    geom_col() +
     scale_fill_manual(values = c("#CC79A7", "#F0E442", "#56B4E9", "#D55E00")) +
-    labs(title = "Group Membership Distribution",
-         x = "Group",
-         y = "Number of Participants") +
-    theme_minimal() +
-    theme(legend.position = "none",
-          axis.text.x = element_text(angle = 45, hjust = 1))
-  
-  return(p)
+    scale_y_continuous(limits = c(0, 1)) +
+    labs(title = "Posterior group probabilities", x = "Participant", y = "Probability", fill = "Group") +
+    theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
 #' Plot Parameters
 #'
-#' @description Creates density plots of parameter distributions
+#' @description Shows the distribution of posterior participant means.
 #' @param fit mfeargen object
 #' @param parameter Character. Which parameter to plot
 #' @return ggplot object
@@ -194,18 +150,17 @@ plot_parameters <- function(fit, parameter = "alpha") {
     stop("Parameter '", parameter, "' not found")
   }
   
-  # Create density plot
-  plot_data <- data.frame(value = param_values)
-  
-  p <- ggplot(plot_data, aes(x = value)) +
-    geom_histogram(aes(y = ..density..), bins = 30, fill = "lightblue", alpha = 0.7) +
-    geom_density(color = "darkblue", size = 1) +
-    labs(title = paste("Distribution of", parameter),
-         x = parameter,
-         y = "Density") +
-    theme_minimal()
-  
-  return(p)
+  plot_data <- data.frame(value = as.vector(param_values))
+  p <- ggplot(plot_data, aes(x = value))
+  if (length(param_values) > 1L && stats::sd(as.vector(param_values)) > 0) {
+    p <- p + geom_histogram(aes(y = after_stat(density)), bins = 30,
+                            fill = "lightblue", alpha = 0.7) +
+      geom_density(color = "darkblue", linewidth = 1)
+  } else {
+    p <- p + geom_point(aes(y = 1), size = 3)
+  }
+  p + labs(title = paste("Posterior means of", parameter), x = parameter,
+           y = if (length(param_values) > 1L) "Density" else "Participant") + theme_minimal()
 }
 
 #' Plot Generalization Gradient
@@ -222,6 +177,8 @@ plot_generalization_gradient <- function(fit, group_separate = TRUE) {
   }
   
   data <- fit$data
+  if ("phase" %in% names(data)) data <- data[data$phase == "generalization", , drop = FALSE]
+  if (!"stimulus" %in% names(data) && "Phy_size" %in% names(data)) data$stimulus <- data$Phy_size
   
   # Calculate mean response by stimulus
   if (!"stimulus" %in% names(data)) {
@@ -244,7 +201,7 @@ plot_generalization_gradient <- function(fit, group_separate = TRUE) {
     } else {
       gradient_data <- aggregate(US_expect ~ stimulus + group_label, data = data, mean)
       p <- ggplot(gradient_data, aes(x = stimulus, y = US_expect, color = group_label)) +
-        geom_line(size = 1.2) +
+        geom_line(linewidth = 1.2) +
         geom_point(size = 3) +
         scale_color_manual(values = c("#CC79A7", "#F0E442", "#56B4E9", "#D55E00")) +
         labs(title = "Generalization Gradients by Group",
@@ -257,7 +214,7 @@ plot_generalization_gradient <- function(fit, group_separate = TRUE) {
   }
   
   p <- ggplot(gradient_data, aes(x = stimulus, y = US_expect)) +
-    geom_line(size = 1.2) +
+    geom_line(linewidth = 1.2) +
     geom_point(size = 3) +
     labs(title = "Overall Generalization Gradient",
          x = "Stimulus",
@@ -298,7 +255,7 @@ plot_parameter_recovery <- function(recovery,
   
   # Lambda recovery
   if ("lambda" %in% parameters && all(c("lambda_true", "lambda_recovered") %in% names(data))) {
-    lambda_data <- subset(data, group > 1)  # Exclude non-learners
+    lambda_data <- subset(data, group > 2)  # Exclude non-learners
     
     plots$lambda <- ggplot(lambda_data, aes(x = lambda_true, y = lambda_recovered)) +
       geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +

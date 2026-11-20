@@ -2,93 +2,22 @@
 % Please edit documentation in R/paper_replication.R
 \name{get_paper_priors}
 \alias{get_paper_priors}
-\title{Get Prior Distributions from Yu et al. (2023)}
+\title{Hyperpriors corresponding to Table 1 of Yu et al. (2023)}
 \usage{
 get_paper_priors(model_type = c("1cs", "2cs"))
 }
 \arguments{
-\item{model_type}{Character string specifying the model type.
-Options are \code{"1cs"} (single CS+ model) or \code{"2cs"}
-(two CS+ model). Default is \code{"1cs"}.}
+\item{model_type}{Either "1cs" or "2cs".}
 }
 \value{
-A list of prior distributions compatible with
-  \code{\link{set_priors}}. The list contains priors for:
-  \itemize{
-    \item \code{alpha}: Learning rate (Beta distribution)
-    \item \code{tau}: Perceptual noise (Gamma distribution)
-    \item \code{theta}: Mixture probabilities (Dirichlet distribution)
-    \item \code{sigma}: Response noise (Gamma distribution)
-  }
+A mfeargen_priors object. These match the published hyperprior
+families; they do not make the package likelihood an exact reproduction
+of the archived analysis. Stimulus units and rating bounds still matter.
 }
 \description{
-Returns the exact prior distributions used in the original paper
-Yu et al. (2023). These priors are weakly informative and based on
-theoretical considerations and pilot data.
-}
-\details{
-The priors used in Yu et al. (2023) were designed to be weakly informative,
-allowing the data to dominate while providing regularization. Specifically:
-
-\strong{Learning rate (alpha)}:
-\itemize{
-  \item Distribution: Beta(2, 2)
-  \item Rationale: Symmetric around 0.5, favors moderate learning rates
-}
-
-\strong{Perceptual noise (tau)}:
-\itemize{
-  \item Distribution: Gamma(1, 0.1)
-  \item Rationale: Weakly informative, mean = 10, allows flexible noise levels
-}
-
-\strong{Mixture probabilities (theta)}:
-\itemize{
-  \item Distribution: Dirichlet(1, 1, 1, 1)
-  \item Rationale: Uniform prior over simplex (non-informative)
-}
-
-\strong{Response noise (sigma)}:
-\itemize{
-  \item Distribution: Gamma(2, 0.5)
-  \item Rationale: Mean = 4, regularizes measurement error
-}
-}
-\examples{
-\dontrun{
-# Get priors for 1CS model
-priors_1cs <- get_paper_priors("1cs")
-print(priors_1cs)
-
-# Get priors for 2CS model
-priors_2cs <- get_paper_priors("2cs")
-print(priors_2cs)
-
-# Use with fit_mfeargen
-data_prepared <- prepare_mfeargen_data(
-  data = exp1_data,
-  participant_id = "participant",
-  us_expectancy = "us_expect",
-  distance_physical = "dphy",
-  distance_perceptual = "dper",
-  cs_indicator = "cs_trials"
-)
-
-fit <- fit_mfeargen(
-  data = data_prepared,
-  priors = priors_1cs,
-  n_chains = 3,
-  n_iter = 5000
-)
-}
+Hyperpriors corresponding to Table 1 of Yu et al. (2023)
 }
 \references{
-Yu, K., Tuerlinckx, F., Vanpaemel, W., & Zaman, J. (2023).
-  A multi-fidelity computational approach to understand human fear learning.
-  \emph{Communications Psychology}, \emph{1}(1), 5.
-  \doi{10.1038/s44271-023-00005-0}
-}
-\seealso{
-\code{\link{set_priors}}, \code{\link{load_paper_data}},
-\code{\link{replicate_paper_analysis}}, \code{\link{get_weak_priors}}
+Yu et al. (2023), Communications Psychology 1, 5.
+\doi{10.1038/s44271-023-00005-0}, Table 1.
 }

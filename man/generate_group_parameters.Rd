@@ -4,14 +4,14 @@
 \alias{generate_group_parameters}
 \title{Generate Group-Specific Parameters}
 \usage{
-generate_group_parameters(group, lambda_threshold, perceptual_noise_sd = 0.5)
+generate_group_parameters(group, lambda_threshold, sigma)
 }
 \arguments{
 \item{group}{Integer (1-4) indicating latent group}
 
 \item{lambda_threshold}{Numeric. Threshold for lambda values}
 
-\item{perceptual_noise_sd}{Numeric. SD for perceptual noise}
+\item{sigma}{Numeric. Shared observation standard deviation.}
 }
 \value{
 List with parameters

@@ -7,14 +7,14 @@
 initialize_mcmc_parameters(jags_data, n.chains)
 }
 \arguments{
-\item{jags_data}{List. Prepared JAGS data}
+\item{jags_data}{List. Prepared JAGS data.}
 
-\item{n.chains}{Integer. Number of chains}
+\item{n.chains}{Integer. Number of chains.}
 }
 \value{
-List of initial values for each chain
+List of initial values for each chain.
 }
 \description{
-Creates initial values for MCMC chains to improve convergence.
+Initialize MCMC Parameters
 }
 \keyword{internal}

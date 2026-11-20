@@ -13,335 +13,247 @@ NULL
 #' @param data Data frame to validate
 #' @param model_type Character. "1cs" or "2cs" (optional)
 #' @param verbose Logical. Print validation messages (default: TRUE)
-#' @return Logical. TRUE if valid, FALSE otherwise
+#' @return TRUE if valid; invalid input raises an error.
 #' @export
 #' @examples
 #' data <- simulate_mfeargen(n_participants = 10)
 #' validate_mfeargen_data(data)
 validate_mfeargen_data <- function(data, model_type = NULL, verbose = TRUE) {
-  
-  if (!is.data.frame(data)) {
-    stop("Input must be a data frame")
+  if (!is.data.frame(data) || nrow(data) == 0L) {
+    stop("data must be a non-empty data frame")
   }
-  
-  # Required columns
-  required_cols <- c("participant", "trials", "US_expect")
-  
-  # Check for required columns
-  missing_cols <- setdiff(required_cols, names(data))
-  if (length(missing_cols) > 0) {
-    stop("Missing required columns: ", paste(missing_cols, collapse = ", "))
+  required <- c("participant", "trials", "US_expect")
+  missing <- setdiff(required, names(data))
+  if (length(missing)) stop("Missing required columns: ", paste(missing, collapse = ", "))
+  if (!(is.numeric(data$participant) || is.character(data$participant) ||
+        is.factor(data$participant)) || anyNA(data$participant) ||
+      any(!nzchar(as.character(data$participant)))) {
+    stop("participant must contain non-missing numeric or character identifiers")
   }
-  
-  # Check data types
-  if (!is.numeric(data$participant)) {
-    stop("'participant' must be positive integers")
+  if (is.numeric(data$participant) && any(!is.finite(data$participant))) {
+    stop("participant identifiers must be finite")
   }
-  
-  if (!is.numeric(data$trials)) {
-    stop("'trials' must be positive integers")
+  if (!is.numeric(data$trials) || anyNA(data$trials) ||
+      any(!is.finite(data$trials) | data$trials < 1 | data$trials != floor(data$trials))) {
+    stop("trials must contain positive integers")
   }
-  
-  if (!is.numeric(data$US_expect)) {
-    stop("'US_expect' must be numeric")
+  if (anyDuplicated(data[c("participant", "trials")])) {
+    stop("Duplicate trial numbers within participant")
   }
-  
-  # Check for model-specific columns
+  if (!is.numeric(data$US_expect) || any(is.infinite(data$US_expect))) {
+    stop("US_expect must be numeric, with finite values or NA")
+  }
+  if (any(vapply(split(data$US_expect, data$participant, drop = TRUE), function(x) all(is.na(x)), logical(1)))) {
+    stop("Each participant must have at least one observed US_expect rating")
+  }
+  if (is.null(model_type)) model_type <- if (all(c("USp", "USm") %in% names(data))) "2cs" else "1cs"
+  if (is.null(model_type)) {
+    model_type <- if (all(c("USp", "USm") %in% names(data))) "2cs" else "1cs"
+  }
   if (!is.null(model_type)) {
-    if (model_type == "1cs") {
-      if (!"US" %in% names(data)) {
-        stop("1CS model requires 'US' column")
-      }
-    } else if (model_type == "2cs") {
-      if (!all(c("USp", "USm") %in% names(data))) {
-        stop("2CS model requires 'USp' and 'USm' columns")
+    model_type <- match.arg(model_type, c("1cs", "2cs"))
+    outcomes <- if (model_type == "1cs") "US" else c("USp", "USm")
+    missing <- setdiff(outcomes, names(data))
+    if (length(missing)) stop("Missing required reinforcement columns: ", paste(missing, collapse = ", "))
+    for (column in outcomes) {
+      x <- data[[column]]
+      allowed <- if (column == "USm") c(-1, 0, 1) else c(0, 1)
+      if (!is.numeric(x) || anyNA(x) || any(!x %in% allowed)) {
+        stop(column, " must contain observed reinforcement outcomes coded ", paste(allowed, collapse = ", "))
       }
     }
   }
-  
-  # Check for distance columns
-  distance_cols <- c("Per_size", "Phy_size")
-  missing_distance <- setdiff(distance_cols, names(data))
-  if (length(missing_distance) > 0) {
-    stop(
-      "Missing required columns: ", paste(missing_distance, collapse = ", "),
-      ". Provide perceptual and physical distance measures before fitting."
-    )
+  indicators <- if (model_type == "1cs") "k" else c("k_plus", "k_minus")
+  distances <- if (model_type == "1cs") c("d_phy", "d_per_old") else
+    c("d_p_phy", "d_m_phy", "d_p_per", "d_m_per")
+  if (all(distances %in% names(data))) {
+    for (column in distances) {
+      if (!is.numeric(data[[column]]) || any(!is.finite(data[[column]]) | data[[column]] < 0)) {
+        stop(column, " must contain finite, non-negative distances")
+      }
+    }
+  } else {
+    missing <- setdiff(c("Phy_size", "Per_size", "stimulus_type"), names(data))
+    if (length(missing)) stop("Missing required columns for stimulus distances: ", paste(missing, collapse = ", "))
+    for (column in c("Phy_size", "Per_size")) {
+      if (!is.numeric(data[[column]]) || any(!is.finite(data[[column]]))) {
+        stop(column, " must contain finite measurements; missing covariates cannot be inferred")
+      }
+    }
   }
-  
-  # Check for valid values
-  if (any(is.na(data$US_expect))) {
-    if (verbose) warning("Data contains missing values in US_expect")
+  if (all(indicators %in% names(data))) {
+    for (column in indicators) {
+      if (!is.numeric(data[[column]]) || anyNA(data[[column]]) || any(!data[[column]] %in% c(0, 1))) {
+        stop(column, " must contain learning indicators coded 0 or 1")
+      }
+    }
+  } else if (!"stimulus_type" %in% names(data) || anyNA(data$stimulus_type)) {
+    stop("Provide non-missing stimulus_type labels or explicit learning indicators")
   }
-  
-  # Check for extreme values
-  if (any(data$US_expect < 0 | data$US_expect > 100, na.rm = TRUE)) {
-    if (verbose) warning("Some US_expect values outside typical rating scale range")
+  if ("phase" %in% names(data) &&
+      (anyNA(data$phase) || any(!data$phase %in% c("conditioning", "generalization")))) {
+    stop("phase must contain 'conditioning' or 'generalization'")
   }
-  
   if (verbose) message("Data validation passed")
-  return(TRUE)
+  TRUE
 }
-
 
 #' Prepare Data for JAGS Model
 #'
 #' @description
 #' Prepares data in the format required by JAGS for model fitting.
-#' Handles both 1CS and 2CS models.
+#' Handles both 1CS and 2CS models. Responses are rescaled internally to 0-10;
+#' the original bounds and participant/trial mapping are stored as attributes.
+#' Unequal trial counts are padded after the last trial. Missing ratings are
+#' allowed when reinforcement and stimulus covariates are observed.
 #'
-#' @param data Data frame with fear generalization data
+#' @param data Data frame with participant, trials and US_expect, plus observed
+#'   reinforcement outcomes (US for 1cs; USp and signed USm for 2cs). USm=-1
+#'   denotes an inhibitory target, 0 no target, and 1 an excitatory target.
+#'   Supply stimulus_type, Phy_size and Per_size, or explicit trial indicators
+#'   and distance columns. When phase is supplied, learning updates occur
+#'   during conditioning only.
 #' @param model_type Character. "1cs" or "2cs"
 #' @param lambda_criterion Numeric. Criterion for lambda threshold (default: 0.7)
-#' @param rating_scale Numeric vector. Rating scale range (optional)
-#' @param priors mfeargen_priors object from set_priors() (optional)
-#' @param use_flexible_priors Logical. Use flexible prior model (default: FALSE)
+#' @param rating_scale Numeric vector c(min, max). Uses simulation metadata
+#'   when available, otherwise the observed range. Specify the experimental
+#'   scale explicitly when participants did not use its full range.
+#' @param priors Must be NULL; supply priors to fit_mfeargen instead.
+#' @param use_flexible_priors Must be FALSE; supply priors to fit_mfeargen instead.
 #' @return List formatted for JAGS
 #' @export
 #' @examples
 #' data <- simulate_mfeargen(n_participants = 10)
 #' jags_data <- prepare_mfeargen_data(data, model_type = "1cs")
-prepare_mfeargen_data <- function(data, 
+prepare_mfeargen_data <- function(data,
                                  model_type = c("1cs", "2cs"),
                                  lambda_criterion = 0.7,
                                  rating_scale = NULL,
                                  priors = NULL,
                                  use_flexible_priors = FALSE) {
-  
   model_type <- match.arg(model_type)
-  
-  # Handle missing US columns before validation
-  if (model_type == "1cs" && !"US" %in% names(data)) {
-    # Create US column from stimulus_type if available
-    if ("stimulus_type" %in% names(data)) {
-      data$US <- as.integer(data$stimulus_type == "CS+")
-    } else {
-      # Default to zeros
-      data$US <- 0
+  if (!is.null(priors) || !identical(use_flexible_priors, FALSE)) {
+    stop("Supply priors to fit_mfeargen(), not prepare_mfeargen_data()")
+  }
+  validate_mfeargen_data(data, model_type, verbose = FALSE)
+  validate_scalar(lambda_criterion, "lambda_criterion", lower = 0, upper = 1,
+                  lower_open = TRUE, upper_open = TRUE)
+
+  participants <- unique(data$participant)
+  participant_rows <- lapply(participants, function(id) {
+    rows <- which(data$participant == id)
+    rows[order(data$trials[rows])]
+  })
+  counts <- lengths(participant_rows)
+  n_participants <- length(participants)
+  n_trials <- max(counts)
+  row_index <- matrix(NA_integer_, n_participants, n_trials)
+  for (i in seq_along(participants)) row_index[i, seq_len(counts[i])] <- participant_rows[[i]]
+  to_matrix <- function(values, padding = 0) {
+    result <- matrix(padding, n_participants, n_trials)
+    present <- !is.na(row_index)
+    result[present] <- values[row_index[present]]
+    result
+  }
+
+  if (is.null(rating_scale)) rating_scale <- attr(data, "rating_scale")
+  if (is.null(rating_scale)) rating_scale <- detect_rating_scale(data$US_expect)
+  validate_rating_scale(rating_scale)
+  if (any(data$US_expect < rating_scale[1] | data$US_expect > rating_scale[2], na.rm = TRUE)) {
+    stop("US_expect contains ratings outside rating_scale")
+  }
+
+  indicators <- if (model_type == "1cs") "k" else c("k_plus", "k_minus")
+  distances <- if (model_type == "1cs") c("d_phy", "d_per_old") else {
+    c("d_p_phy", "d_m_phy", "d_p_per", "d_m_per")
+  }
+  explicit_indicators <- all(indicators %in% names(data))
+  explicit_distances <- all(distances %in% names(data))
+  if (!explicit_indicators) {
+    if (!"stimulus_type" %in% names(data) || anyNA(data$stimulus_type) ||
+        any(!data$stimulus_type %in% c("CS+", "CS-", "GS"))) {
+      stop("Provide stimulus_type ('CS+', 'CS-', 'GS') or explicit learning indicators: ",
+           paste(indicators, collapse = ", "))
     }
-  } else if (model_type == "2cs") {
-    if (!"USp" %in% names(data) || !"USm" %in% names(data)) {
-      # Create USp and USm from stimulus_type if available
-      if ("stimulus_type" %in% names(data)) {
-        data$USp <- as.integer(data$stimulus_type == "CS+")
-        data$USm <- as.integer(data$stimulus_type == "CS-")
+    data[[indicators[1]]] <- as.integer(data$stimulus_type == "CS+")
+    if (model_type == "2cs") data$k_minus <- as.integer(data$stimulus_type == "CS-")
+  }
+  for (column in indicators) {
+    if (!is.numeric(data[[column]]) || anyNA(data[[column]]) || any(!data[[column]] %in% c(0, 1))) {
+      stop(column, " must contain learning indicators coded 0 or 1")
+    }
+  }
+  if (model_type == "2cs" && any(data$k_plus + data$k_minus > 1)) {
+    stop("k_plus and k_minus cannot both be 1 on the same trial")
+  }
+
+  if (!explicit_distances) {
+    required <- c("Phy_size", "Per_size", "stimulus_type")
+    missing <- setdiff(required, names(data))
+    if (length(missing)) stop("Missing required columns for stimulus distances: ", paste(missing, collapse = ", "))
+    for (column in c("Phy_size", "Per_size")) {
+      if (!is.numeric(data[[column]]) || any(!is.finite(data[[column]]))) {
+        stop(column, " must contain finite measurements; missing covariates cannot be inferred")
+      }
+    }
+    reference <- function(rows, label) {
+      values <- unique(data$Phy_size[rows][data$stimulus_type[rows] == label])
+      if (length(values) != 1L) {
+        stop("Each participant needs exactly one physical reference for ", label,
+             "; provide explicit distance columns for other designs")
+      }
+      values
+    }
+    for (column in distances) data[[column]] <- numeric(nrow(data))
+    for (rows in participant_rows) {
+      cs_plus <- reference(rows, "CS+")
+      if (model_type == "1cs") {
+        data$d_phy[rows] <- abs(data$Phy_size[rows] - cs_plus)
+        data$d_per_old[rows] <- abs(data$Per_size[rows] - cs_plus)
       } else {
-        # Default to zeros
-        data$USp <- 0
-        data$USm <- 0
+        cs_minus <- reference(rows, "CS-")
+        if (cs_plus == cs_minus) stop("CS+ and CS- references must differ")
+        data$d_p_phy[rows] <- abs(data$Phy_size[rows] - cs_plus)
+        data$d_m_phy[rows] <- abs(data$Phy_size[rows] - cs_minus)
+        data$d_p_per[rows] <- abs(data$Per_size[rows] - cs_plus)
+        data$d_m_per[rows] <- abs(data$Per_size[rows] - cs_minus)
       }
     }
   }
-  
-  # Validate structure (ensures required distance columns exist)
-  validate_mfeargen_data(data, model_type = model_type, verbose = FALSE)
-  
-  # Validate data
-  if (!validate_mfeargen_data(data, model_type, verbose = FALSE)) {
-    stop("Data validation failed. Run validate_mfeargen_data() for details.")
-  }
-  
-  # Get unique participants and trials
-  participants <- unique(data$participant)
-  n_participants <- length(participants)
-  n_trials <- max(data$trials)
-  
-  # Initialize matrices
-  y <- matrix(NA, n_participants, n_trials)
-  
-  # Fill response matrix
-  for (i in seq_along(participants)) {
-    p_data <- subset(data, participant == participants[i])
-    p_data <- p_data[order(p_data$trials), ]
-    y[i, ] <- p_data$US_expect
-  }
-  
-  # Detect rating scale if not provided
-  if (is.null(rating_scale)) {
-    rating_scale <- detect_rating_scale(data$US_expect)
-    message("Detected rating scale: [", rating_scale[1], ", ", rating_scale[2], "]")
-  }
-  
-  # Calculate distances
-  d_phy <- matrix(NA, n_participants, n_trials)
-  d_per <- matrix(NA, n_participants, n_trials)
-  
-  for (i in seq_along(participants)) {
-    p_data <- subset(data, participant == participants[i])
-    p_data <- p_data[order(p_data$trials), ]
-    
-    # Calculate physical distances from CS+
-    if ("stimulus_type" %in% names(p_data) && "Phy_size" %in% names(p_data)) {
-      cs_plus <- median(p_data$Phy_size[p_data$stimulus_type == "CS+"], na.rm = TRUE)
-      if (is.na(cs_plus)) cs_plus <- median(p_data$Phy_size, na.rm = TRUE)
-    } else {
-      cs_plus <- median(p_data$Phy_size, na.rm = TRUE)
+  for (column in distances) {
+    if (!is.numeric(data[[column]]) || any(!is.finite(data[[column]]) | data[[column]] < 0)) {
+      stop(column, " must contain finite, non-negative distances")
     }
-    
-    if (!is.finite(cs_plus)) {
-      stop("Unable to determine reference stimulus for distance calculation; check 'Phy_size' values.")
-    }
-    
-    phy_vals <- abs(p_data$Phy_size - cs_plus)
-    if (anyNA(phy_vals)) {
-      phy_vals[is.na(phy_vals)] <- 0
-    }
-    per_vals <- abs(p_data$Per_size - cs_plus)
-    if (anyNA(per_vals)) {
-      fallback <- abs(p_data$Phy_size - cs_plus)
-      per_vals[is.na(per_vals) & !is.na(fallback)] <- fallback[is.na(per_vals) & !is.na(fallback)]
-      per_vals[is.na(per_vals)] <- 0
-    }
-    d_phy[i, ] <- phy_vals
-    d_per[i, ] <- per_vals
   }
-  
-  # Calculate lambda threshold
-  max_distance <- max(d_phy, na.rm = TRUE)
-  if (max_distance == 0) max_distance <- 10
-  lambda_threshold <- -log(lambda_criterion) / max_distance
-  
-  # Prepare model-specific data
+  if ("phase" %in% names(data)) {
+    for (column in indicators) data[[column]] <- data[[column]] * as.integer(data$phase == "conditioning")
+  }
+
+  physical_columns <- if (model_type == "1cs") "d_phy" else c("d_p_phy", "d_m_phy")
+  max_distance <- max(unlist(data[physical_columns], use.names = FALSE))
+  if (max_distance <= 0) stop("At least one nonzero physical distance is required to define lambda_threshold")
   jags_data <- list(
-    y = y,
+    y = to_matrix(10 * normalize_ratings(data$US_expect, rating_scale), NA_real_),
     Nparticipants = n_participants,
     Ntrials = n_trials,
-    lambda_threshold = lambda_threshold,
-    rating_scale = rating_scale
+    lambda_threshold = calculate_lambda_threshold(max_distance, lambda_criterion),
+    rating_scale = c(0, 10)
   )
-  
+  for (column in c(indicators, distances)) jags_data[[column]] <- to_matrix(data[[column]])
   if (model_type == "1cs") {
-    # 1CS model data
-    k <- r <- matrix(0, n_participants, n_trials)
-    
-    for (i in seq_along(participants)) {
-      p_data <- subset(data, participant == participants[i])
-      p_data <- p_data[order(p_data$trials), ]
-      
-      if ("US" %in% names(p_data)) {
-        r[i, ] <- p_data$US
-        if ("stimulus_type" %in% names(p_data)) {
-          k[i, ] <- as.integer(p_data$stimulus_type == "CS+")
-        } else {
-          # Default: assume CS+ trials are when US is presented
-          k[i, ] <- as.integer(p_data$US > 0)
-        }
-      }
-    }
-    
-    jags_data$k <- k
-    jags_data$r <- r
-    jags_data$d_phy <- d_phy
-    jags_data$d_per_old <- d_per
-    
+    jags_data$r <- to_matrix(data$US)
   } else {
-    # 2CS model data
-    kplus <- kminus <- rplus <- rminus <- matrix(0, n_participants, n_trials)
-    d_p_phy <- d_m_phy <- matrix(NA, n_participants, n_trials)
-    
-    for (i in seq_along(participants)) {
-      p_data <- subset(data, participant == participants[i])
-      p_data <- p_data[order(p_data$trials), ]
-      
-      # Handle stimulus type indicators
-      if ("stimulus_type" %in% names(p_data)) {
-        kplus[i, ] <- as.integer(p_data$stimulus_type == "CS+")
-        kminus[i, ] <- as.integer(p_data$stimulus_type == "CS-")
-      } else if (all(c("USp", "USm") %in% names(p_data))) {
-        # Default: use US indicators for stimulus type
-        kplus[i, ] <- as.integer(p_data$USp > 0)
-        kminus[i, ] <- as.integer(p_data$USm > 0)
-      }
-      
-      # Handle reinforcement - CS+ can be reinforced, CS- is never reinforced
-      if ("USp" %in% names(p_data)) {
-        rplus[i, ] <- p_data$USp
-      }
-      
-      # CS- is never reinforced (r_minus should always be 0 for CS- trials)
-      # Even if USm column exists, CS- trials should have r_minus = 0
-      rminus[i, ] <- rep(0, n_trials)  # CS- is never reinforced
-      
-      # Calculate distances from CS+ and CS-
-      if ("stimulus_type" %in% names(p_data) && "Phy_size" %in% names(p_data)) {
-        cs_plus <- median(p_data$Phy_size[p_data$stimulus_type == "CS+"], na.rm = TRUE)
-        cs_minus <- median(p_data$Phy_size[p_data$stimulus_type == "CS-"], na.rm = TRUE)
-      } else {
-        # Default values if columns missing
-        cs_plus <- 5.5
-        cs_minus <- 3.5
-      }
-      
-      if (!is.na(cs_plus) && "Phy_size" %in% names(p_data)) {
-        d_p_phy[i, ] <- abs(p_data$Phy_size - cs_plus)
-      } else {
-        # Default distances
-        d_p_phy[i, ] <- seq(0, 10, length.out = nrow(p_data))
-      }
-      
-      if (!is.na(cs_minus) && "Phy_size" %in% names(p_data)) {
-        d_m_phy[i, ] <- abs(p_data$Phy_size - cs_minus)
-      } else {
-        # Default distances
-        d_m_phy[i, ] <- seq(0, 10, length.out = nrow(p_data))
-      }
-    }
-    
-    jags_data$k_plus <- kplus
-    jags_data$k_minus <- kminus
-    jags_data$r_plus <- rplus
-    jags_data$r_minus <- rminus
-    jags_data$d_p_phy <- d_p_phy
-    jags_data$d_m_phy <- d_m_phy
+    jags_data$r_plus <- to_matrix(data$USp)
+    jags_data$r_minus <- to_matrix(data$USm)
   }
-  
-  # Add prior parameters if using flexible priors
-  if (use_flexible_priors) {
-    # Use provided priors or defaults
-    if (is.null(priors)) {
-      if (!requireNamespace("mfeargen", quietly = TRUE)) {
-        stop("mfeargen package required for default priors")
-      }
-      priors <- get_default_priors()
-    }
-    
-    # Validate priors
-    if (!inherits(priors, "mfeargen_priors")) {
-      stop("Priors must be created with set_priors() function")
-    }
-    
-    # Add prior parameters to JAGS data
-    jags_data$prior_lambda_mu_mean <- priors$lambda_mu$mean
-    jags_data$prior_lambda_mu_precision <- priors$lambda_mu$precision
-    jags_data$prior_lambda_sigma_min <- priors$lambda_sigma$min
-    jags_data$prior_lambda_sigma_max <- priors$lambda_sigma$max
-    
-    jags_data$prior_alpha_mu_a <- priors$alpha_mu$a
-    jags_data$prior_alpha_mu_b <- priors$alpha_mu$b
-    jags_data$prior_alpha_kappa_min <- priors$alpha_kappa$min
-    jags_data$prior_alpha_kappa_max <- priors$alpha_kappa$max
-    
-    jags_data$prior_sigma1_min <- priors$sigma1$min
-    jags_data$prior_sigma1_max <- priors$sigma1$max
-    jags_data$prior_sigma2_min <- priors$sigma2$min
-    jags_data$prior_sigma2_max <- priors$sigma2$max
-    
-    jags_data$prior_pi_alpha <- priors$pi$alpha
-    
-    jags_data$prior_w0_mu_mean <- priors$w0_mu$mean
-    jags_data$prior_w0_mu_precision <- priors$w0_mu$precision
-    jags_data$prior_w0_sigma_shape <- priors$w0_sigma$shape
-    jags_data$prior_w0_sigma_rate <- priors$w0_sigma$rate
-    
-    jags_data$prior_w1_a_shape <- priors$w1_a$shape
-    jags_data$prior_w1_a_rate <- priors$w1_a$rate
-    jags_data$prior_w1_b_shape <- priors$w1_b$shape
-    jags_data$prior_w1_b_rate <- priors$w1_b$rate
-  }
-  
-  return(jags_data)
+  attr(jags_data, "participants") <- participants
+  attr(jags_data, "trial_counts") <- counts
+  attr(jags_data, "row_index") <- row_index
+  attr(jags_data, "observed") <- !is.na(jags_data$y)
+  attr(jags_data, "model_type") <- model_type
+  attr(jags_data, "rating_scale") <- rating_scale
+  jags_data
 }
-
 
 #' Detect Rating Scale Range
 #'
@@ -356,22 +268,16 @@ prepare_mfeargen_data <- function(data,
 #' responses <- c(1, 2, 5, 8, 9, 10)
 #' detect_rating_scale(responses)
 detect_rating_scale <- function(responses, buffer = 0) {
-  
-  responses <- responses[!is.na(responses)]
-  
-  if (length(responses) == 0) {
-    warning("No valid responses to detect scale")
-    return(c(1, 10))
+  if (!is.numeric(responses) || any(is.infinite(responses))) {
+    stop("responses must be numeric, with finite values or NA")
   }
-  
-  min_val <- min(responses)
-  max_val <- max(responses)
-  
-  # Return the actual observed range of the data
-  # This is the correct approach - use what participants actually used
-  return(c(min_val - buffer, max_val + buffer))
+  validate_scalar(buffer, "buffer", lower = 0)
+  responses <- responses[!is.na(responses)]
+  if (!length(responses)) stop("Cannot detect a rating scale without observed responses")
+  scale <- range(responses) + c(-buffer, buffer)
+  if (scale[1] == scale[2]) stop("Constant ratings require an explicit rating_scale")
+  scale
 }
-
 
 #' Normalize Ratings to 0-1 Scale
 #'
@@ -386,23 +292,12 @@ detect_rating_scale <- function(responses, buffer = 0) {
 #' ratings <- c(1, 5, 10)
 #' normalize_ratings(ratings, scale = c(1, 10))
 normalize_ratings <- function(ratings, scale = NULL) {
-  
-  if (is.null(scale)) {
-    scale <- detect_rating_scale(ratings)
-  }
-  
-  if (length(scale) != 2) {
-    stop("Scale must be a vector of length 2: c(min, max)")
-  }
-  
-  normalized <- (ratings - scale[1]) / (scale[2] - scale[1])
-  
-  # Clip to [0, 1]
-  normalized <- pmax(0, pmin(1, normalized))
-  
-  return(normalized)
+  if (!is.numeric(ratings) || any(is.infinite(ratings))) stop("ratings must be numeric and finite or NA")
+  if (is.null(scale)) scale <- detect_rating_scale(ratings)
+  validate_rating_scale(scale)
+  if (any(ratings < scale[1] | ratings > scale[2], na.rm = TRUE)) stop("ratings lie outside scale")
+  (ratings - scale[1]) / diff(scale)
 }
-
 
 #' Denormalize Ratings from 0-1 Scale
 #'
@@ -417,12 +312,10 @@ normalize_ratings <- function(ratings, scale = NULL) {
 #' normalized <- c(0, 0.5, 1)
 #' denormalize_ratings(normalized, scale = c(1, 10))
 denormalize_ratings <- function(normalized, scale) {
-  
-  if (length(scale) != 2) {
-    stop("Scale must be a vector of length 2: c(min, max)")
+  validate_rating_scale(scale)
+  if (!is.numeric(normalized) || any(is.infinite(normalized)) ||
+      any(normalized < 0 | normalized > 1, na.rm = TRUE)) {
+    stop("normalized must contain values between 0 and 1, or NA")
   }
-  
-  denormalized <- normalized * (scale[2] - scale[1]) + scale[1]
-  
-  return(denormalized)
+  normalized * diff(scale) + scale[1]
 }

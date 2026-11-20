@@ -48,13 +48,13 @@ set_priors(
 
 \item{alpha_kappa_max}{Upper bound for alpha_kappa uniform prior (default: 10)}
 
-\item{sigma1_min}{Lower bound for sigma[1] uniform prior (default: 1e-9)}
+\item{sigma1_min}{Lower bound for \code{sigma[1]} uniform prior (default: 1e-9)}
 
-\item{sigma1_max}{Upper bound for sigma[1] uniform prior (default: 1.5)}
+\item{sigma1_max}{Upper bound for \code{sigma[1]} uniform prior (default: 1.5)}
 
-\item{sigma2_min}{Lower bound for sigma[2] uniform prior (default: 1.5)}
+\item{sigma2_min}{Lower bound for \code{sigma[2]} uniform prior (default: 1.5)}
 
-\item{sigma2_max}{Upper bound for sigma[2] uniform prior (default: 3)}
+\item{sigma2_max}{Upper bound for \code{sigma[2]} uniform prior (default: 3)}
 
 \item{pi_alpha}{Dirichlet alpha parameters for group probabilities (default: c(1,1,1,1))}
 

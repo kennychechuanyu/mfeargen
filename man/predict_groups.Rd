@@ -9,7 +9,8 @@ predict_groups(object, threshold = 0.5, ...)
 \arguments{
 \item{object}{An mfeargen object from fit_mfeargen}
 
-\item{threshold}{Numeric. Probability threshold for group assignment (default: 0.5)}
+\item{threshold}{Numeric. Minimum posterior probability for assignment.
+Participants below this threshold receive NA group labels (default: 0.5).}
 
 \item{...}{Additional arguments (ignored)}
 }

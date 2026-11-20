@@ -5,74 +5,43 @@
 \alias{exp1_data}
 \title{Experiment 1 Data from Yu et al. (2023)}
 \format{
-A data frame with 7,520 observations and 17 variables:
+A data frame with 7,520 rows and 17 variables:
 \describe{
-  \item{participant}{Participant identifier (numeric, 1-40)}
-  \item{trials}{Trial number within participant}
-  \item{dphy}{Physical distance from CS+ (Euclidean distance in pixel space)}
-  \item{dper}{Perceptual distance from CS+ (measured through MDS)}
-  \item{block_number}{Experimental block number}
-  \item{trial_number}{Trial number within block}
-  \item{US}{US presence indicator (0 = absent, 1 = present)}
-  \item{startle_circle}{Startle probe during stimulus presentation (0/1)}
-  \item{startle_iti}{Startle probe during inter-trial interval (0/1)}
-  \item{per_size}{Perceptual size of stimulus (MDS-derived)}
-  \item{us_expect}{US expectancy rating (0-10 scale, NA for ITI trials)}
-  \item{total_trial_nr}{Total trial number across experiment}
-  \item{stimulus}{Stimulus label (CS+ or generalization stimuli)}
-  \item{stimulus_phy}{Physical stimulus identifier (S1-S10)}
-  \item{cs_trials}{Indicator for CS+ trials (1) vs generalization trials (0)}
-  \item{cs_phy}{Physical size of CS+ stimulus}
-  \item{phy_size}{Physical size of presented stimulus}
+\item{participant}{Participant identifier, 1-40.}
+\item{trials}{Trial order within participant.}
+\item{dphy, dper}{Physical and perceptual distances from CS+.}
+\item{block_number, trial_number}{Experimental block and trial within block.}
+\item{US}{Observed aversive outcome, 0 or 1.}
+\item{startle_circle, startle_iti}{Startle probe indicators during stimulus
+presentation and the inter-trial interval.}
+\item{per_size}{Perceptual stimulus measurement.}
+\item{us_expect}{US expectancy rating on the original 0-10 scale.}
+\item{total_trial_nr}{Trial number across the experiment.}
+\item{stimulus, stimulus_phy}{Stimulus label and physical stimulus identifier.}
+\item{cs_trials}{CS+ trial indicator, 0 or 1.}
+\item{cs_phy, phy_size}{Physical CS+ value and presented stimulus value.}
 }
 }
 \source{
 Yu, K., Tuerlinckx, F., Vanpaemel, W., & Zaman, J. (2023).
-  A multi-fidelity computational approach to understand human fear learning.
-  \emph{Communications Psychology}, \emph{1}(1), 5.
+Humans display interindividual differences in the latent mechanisms
+underlying fear generalization behaviour. \emph{Communications Psychology}, 1, 5.
+\doi{10.1038/s44271-023-00005-0}
 }
 \usage{
 exp1_data
 }
 \description{
-Fear generalization data from Experiment 1 of Yu et al. (2023), which used
-a single CS+ design (1CS). Participants underwent a conditioning phase where
-one stimulus (CS+) was paired with an aversive outcome (US), followed by a
-generalization phase where similar stimuli were presented without reinforcement.
+Trial-level data from the single-CS+ experiment in Yu et al. (2023).
+Ratings and distances use the original study's variable names and units.
 }
 \details{
-The experiment used circle stimuli varying in size. The CS+ was reinforced
-during conditioning, and generalization was measured using stimuli of different
-sizes. Distance metrics include both physical (pixel-based) and perceptual
-(MDS-derived) measures.
-
-NA values in \code{us_expect}, \code{dphy}, and \code{dper} occur during
-inter-trial intervals (ITI) when no stimulus was presented.
+The stored data contain missing ratings and distances. Use
+\code{\link[=load_paper_data]{load_paper_data()}} to inspect the original data and
+\code{\link[=replicate_paper_analysis]{replicate_paper_analysis()}} for the supported reanalysis workflow.
 }
 \examples{
-\dontrun{
-# Load the data
 data(exp1_data)
-
-# View structure
-str(exp1_data)
-
-# Number of participants
-length(unique(exp1_data$participant))
-
-# Prepare for analysis
-# (Rename columns to match expected format)
-exp1_data$US_expect <- exp1_data$us_expect
-exp1_data$Per_size <- exp1_data$per_size
-exp1_data$Phy_size <- exp1_data$phy_size
-
-model_data <- prepare_mfeargen_data(
-  data = exp1_data,
-  model_type = "1cs"
-)
-}
-}
-\references{
-\doi{10.1038/s44271-023-00005-0}
+head(exp1_data)
 }
 \keyword{datasets}

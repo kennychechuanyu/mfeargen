@@ -1,338 +1,157 @@
-# S3 Methods for mfeargen Objects
-
-#' Print Method for mfeargen Objects
-#'
-#' @param x A mfeargen object
-#' @param ... Additional arguments (ignored)
-#' @return Invisibly returns the input object
-#' @importFrom stats fitted
+#' Print a fitted fear generalization model
+#' @param x A fitted mfeargen model.
+#' @param ... Additional arguments (ignored).
+#' @return The input, invisibly.
 #' @export
 print.mfeargen <- function(x, ...) {
-  
-  model_type <- if (!is.null(x$model_type)) x$model_type else NA
-  n_participants <- if (!is.null(x$jags_data$Nparticipants)) x$jags_data$Nparticipants else NA
-  n_trials <- if (!is.null(x$jags_data$Ntrials)) x$jags_data$Ntrials else NA
-  lambda_threshold <- if (!is.null(x$lambda_threshold)) round(x$lambda_threshold, 4) else NA
-  n_iter <- if (!is.null(x$n.iter)) x$n.iter else NA
-  n_burn <- if (!is.null(x$n.burnin)) x$n.burnin else NA
-  n_chains <- if (!is.null(x$n.chains)) x$n.chains else NA
-  convergence_info <- x$convergence
-
-  cat("mfeargen Bayesian Mixture Model\n")
-  cat("===============================\n\n")
-  
-  # Basic model info
-  cat("Model Type:", model_type, "\n")
-  cat("Participants:", n_participants, "\n")
-  cat("Trials:", n_trials, "\n")
-  cat("Lambda Threshold:", lambda_threshold, "\n")
-  cat("MCMC Iterations:", n_iter, "(burnin:", n_burn, ")\n")
-  cat("Chains:", n_chains, "\n\n")
-  
-  # Convergence info
-  if (!is.null(convergence_info)) {
-    if (!is.null(convergence_info$converged) && convergence_info$converged) {
-      cat("Convergence: GOOD\n")
-    } else if (!is.null(convergence_info$converged) && !convergence_info$converged) {
-      cat("Convergence: ISSUES DETECTED\n")
-      if (!is.null(convergence_info$max_rhat)) {
-        cat("  Max R-hat:", round(convergence_info$max_rhat, 3), "\n")
-      }
-      if (!is.null(convergence_info$min_neff)) {
-        cat("  Min n.eff:", round(convergence_info$min_neff, 0), "\n")
-      }
-    } else {
-      cat("Convergence: Not checked\n")
-    }
-  } else {
-    cat("Convergence: Not available\n")
+  cat("Fear generalization mixture model (", x$model_type, ")\n", sep = "")
+  cat(x$jags_data$Nparticipants, "participants; up to",
+      x$jags_data$Ntrials, "trials per participant\n")
+  cat(x$n.chains, "chains;", x$n.iter, "iterations;", x$n.burnin, "burn-in\n")
+  if (!is.null(x$convergence)) {
+    cat("Convergence:", if (isTRUE(x$convergence$converged)) "passed" else "requires review", "\n")
   }
-  
-  # Group membership summary
-  if (!is.null(x$group_membership)) {
-    cat("\nGroup Membership:\n")
-    group_counts <- table(x$group_membership$group_label)
-    for (group in names(group_counts)) {
-      cat("  ", group, ":", group_counts[group], "\n")
-    }
-  }
-  
-  # Model fit
-  if (!is.null(x$jags_fit) && "DIC" %in% names(x$jags_fit)) {
-    cat("\nModel Fit:\n")
-    cat("  DIC:", round(x$jags_fit$DIC, 2), "\n")
-  }
-  
-  cat("\nUse summary() for detailed parameter estimates\n")
-  cat("Use plot() for visualizations\n")
-  
+  if (!is.null(x$group_membership)) print(table(x$group_membership$group_label))
   invisible(x)
 }
 
-#' Summary Method for mfeargen Objects
-#' 
-#' @param object A mfeargen object
-#' @param ... Additional arguments (ignored)
-#' @return A summary object
+#' Summarize a fitted model
+#' @param object A fitted mfeargen model.
+#' @param ... Additional arguments (ignored).
+#' @return Parameter summaries, group probabilities, and convergence diagnostics.
 #' @export
 summary.mfeargen <- function(object, ...) {
-  
-  # Extract key parameters
-  params <- extract_parameters(object)
-  
-  # Group probabilities
-  pi_summary <- object$jags_fit$summary[grepl("^pi\\[", rownames(object$jags_fit$summary)), ]
-  
-  # Create summary object
-  summary_obj <- list(
+  s <- object$jags_fit$summary
+  structure(list(
     call = object$call,
     model_type = object$model_type,
     n_participants = object$jags_data$Nparticipants,
     n_trials = object$jags_data$Ntrials,
-    lambda_threshold = object$lambda_threshold,
+    parameters = stats::coef(object),
     group_membership = object$group_membership,
-    group_probabilities = pi_summary,
+    group_probabilities = s[grepl("^pi\\[", rownames(s)), , drop = FALSE],
     convergence = object$convergence,
     dic = object$jags_fit$DIC
-  )
-  
-  class(summary_obj) <- "summary.mfeargen"
-  return(summary_obj)
+  ), class = "summary.mfeargen")
 }
 
-#' Print Method for mfeargen Summary Objects
-#' 
-#' @param x A summary.mfeargen object
-#' @param ... Additional arguments (ignored)
-#' @return Invisibly returns the input object
+#' Print model summaries
+#' @param x A summary.mfeargen object.
+#' @param ... Additional arguments (ignored).
+#' @return The input, invisibly.
 #' @export
 print.summary.mfeargen <- function(x, ...) {
-  
-  cat("mfeargen Model Summary\n")
-  cat("=====================\n\n")
-  
-  # Call
-  cat("Call:\n")
+  cat("Fear generalization model summary (", x$model_type, ")\n", sep = "")
   print(x$call)
-  cat("\n")
-  
-  # Model details
-  cat("Model Type:", x$model_type, "\n")
-  cat("Participants:", x$n_participants, "\n")
-  cat("Trials:", x$n_trials, "\n")
-  cat("Lambda Threshold:", round(x$lambda_threshold, 4), "\n\n")
-  
-  # Group probabilities
-  cat("Group Probabilities:\n")
+  cat("\nGroup probabilities:\n")
   print(round(x$group_probabilities, 3))
-  cat("\n")
-  
-  # Group membership counts
-  cat("Group Membership (threshold = 0.75):\n")
-  group_counts <- table(x$group_membership$assigned_group)
-  for (group in names(group_counts)) {
-    pct <- round(100 * group_counts[group] / x$n_participants, 1)
-    cat("  ", group, ":", group_counts[group], "(", pct, "%)\n")
-  }
-  
-  # Convergence
-  cat("\nConvergence:\n")
-  if (x$convergence$convergence_ok) {
-    cat("  Status: GOOD\n")
-  } else {
-    cat("  Status: ISSUES\n")
-    cat("  Max R-hat:", round(x$convergence$max_rhat, 3), "\n")
-    cat("  Min n.eff:", round(x$convergence$min_neff, 0), "\n")
-  }
-  
-  # Model fit
-  cat("\nModel Fit:\n")
-  cat("  DIC:", round(x$dic, 2), "\n")
-  
+  cat("\nParameter estimates:\n")
+  print(x$parameters)
+  cat("\nConvergence:", if (isTRUE(x$convergence$converged)) "passed" else "requires review", "\n")
+  if (!is.null(x$dic)) cat("DIC:", round(x$dic, 2), "\n")
   invisible(x)
 }
 
-
-#' Coefficients for mfeargen Objects
-#'
-#' @param object A mfeargen object
-#' @param ... Additional arguments (ignored)
-#' @return Named list of parameter summaries
+#' Extract posterior coefficient summaries
+#' @param object A fitted mfeargen model.
+#' @param ... Additional arguments (ignored).
+#' @return A data frame with parameter names, posterior means, standard
+#'   deviations, and 95 percent credible intervals. Standard deviations describe
+#'   posterior uncertainty, rather than frequentist standard errors.
 #' @export
 coef.mfeargen <- function(object, ...) {
-  if (!inherits(object, "mfeargen")) {
-    stop("Input must be a mfeargen object")
-  }
-  summary_mat <- object$jags_fit$summary
-  if (is.null(summary_mat)) {
-    return(list())
-  }
-  extract_block <- function(pattern) {
-    rows <- grepl(pattern, rownames(summary_mat))
-    if (!any(rows)) return(NULL)
-    summary_mat[rows, , drop = FALSE]
-  }
-  result <- list(
-    alpha = extract_block("^alpha\\["),
-    lambda = extract_block("^lambda\\["),
-    sigma = extract_block("^sigma\\[")
-  )
-  Filter(Negate(is.null), result)
+  s <- object$jags_fit$summary
+  keep <- grepl("^(alpha|lambda|w0|w1|sigma|pi)(\\[|$)", rownames(s))
+  s <- s[keep, , drop = FALSE]
+  data.frame(parameter = rownames(s), estimate = s[, "mean"],
+             posterior_sd = s[, "sd"], ci_lower = s[, "2.5%"],
+             ci_upper = s[, "97.5%"], row.names = NULL)
 }
 
-
-#' Predict Method for mfeargen Objects
-#' 
-#' @param object A mfeargen object
-#' @param newdata Optional new data for prediction
-#' @param type Character. Type of prediction ("groups", "response")
-#' @param ... Additional arguments
-#' @return Predictions based on type
+#' Predictions for fitted participants
+#' @param object A fitted mfeargen model.
+#' @param newdata Reserved for future use; must be NULL.
+#' @param type Either "groups" or "response".
+#' @param ... Arguments passed to predict_groups or fitted.
+#' @return Group assignments or posterior mean expected responses.
 #' @export
-predict.mfeargen <- function(object, newdata = NULL, type = "groups", ...) {
-  
-  switch(type,
-    "groups" = predict_groups(object, ...),
-    "response" = {
-      preds <- fitted(object)
-      if (is.null(preds)) {
-        stop("Posterior predictions are not available for this fit. ",
-             "Re-run the model with posterior predictive monitoring enabled.")
-      }
-      preds
-    },
-    stop("Unknown prediction type: ", type, 
-         ". Options: 'groups', 'response'")
-  )
+predict.mfeargen <- function(object, newdata = NULL,
+                            type = c("groups", "response"), ...) {
+  if (!is.null(newdata)) {
+    stop("Prediction for newdata is not implemented; omit newdata to predict fitted participants.")
+  }
+  type <- match.arg(type)
+  if (type == "groups") predict_groups(object, ...) else stats::fitted(object, ...)
 }
 
-#' Residuals Method for mfeargen Objects
-#' 
-#' @param object A mfeargen object
-#' @param type Character. Type of residuals ("raw", "standardized")
-#' @param ... Additional arguments (ignored)
-#' @return Matrix of residuals
+#' Posterior mean expected responses
+#' @param object A fitted mfeargen model.
+#' @param scale "response" for the original rating scale, or "normalized" for 0-10.
+#' @param ... Additional arguments (ignored).
+#' @return A participant by trial matrix. Rows retain participant IDs; trailing
+#'   padded trials are NA. Values are expectations from theta, not noisy
+#'   posterior predictive draws.
 #' @export
-residuals.mfeargen <- function(object, type = "raw", ...) {
-  
-  # Extract observed data
-  y_obs <- object$jags_data$y
-  
-  # Get fitted values using the fitted method
-  theta_matrix <- fitted(object)
-  
-  if (is.null(theta_matrix)) {
-    warning("Cannot compute residuals: no fitted values available")
-    return(NULL)
+fitted.mfeargen <- function(object, scale = c("response", "normalized"), ...) {
+  scale <- match.arg(scale)
+  theta <- object$jags_fit$mean$theta
+  if (is.null(theta) && !is.null(object$jags_fit$sims.list$theta)) {
+    theta <- apply(object$jags_fit$sims.list$theta, c(2, 3), mean)
   }
-  
-  # Ensure dimensions match
-  if (!all(dim(y_obs) == dim(theta_matrix))) {
-    warning("Dimension mismatch between observed and fitted values")
-    return(NULL)
+  if (is.null(theta)) stop("Expected responses were not monitored; refit with theta monitoring.")
+  if (length(theta) != length(object$jags_data$y)) stop("Unexpected theta dimensions in model output.")
+  theta <- matrix(theta, nrow = object$jags_data$Nparticipants,
+                  ncol = object$jags_data$Ntrials)
+  rownames(theta) <- as.character(attr(object$jags_data, "participants"))
+  row_index <- attr(object$jags_data, "row_index")
+  if (!is.null(row_index)) theta[is.na(row_index)] <- NA_real_
+  if (scale == "response") {
+    bounds <- object$rating_scale
+    if (is.null(bounds)) bounds <- attr(object$jags_data, "rating_scale")
+    if (!is.null(bounds)) theta <- theta / 10 * diff(bounds) + bounds[1]
   }
-  
-  # Calculate residuals
-  residuals <- y_obs - theta_matrix
-  
+  theta
+}
+
+#' Model residuals
+#' @param object A fitted mfeargen model.
+#' @param type "raw" on the original rating scale, or "standardized" by the
+#'   participant's posterior mean observation standard deviation.
+#' @param ... Additional arguments (ignored).
+#' @return A participant by trial matrix, with NA for missing observations.
+#' @export
+residuals.mfeargen <- function(object, type = c("raw", "standardized"), ...) {
+  type <- match.arg(type)
+  result <- object$jags_data$y - stats::fitted(object, scale = "normalized")
   if (type == "standardized") {
-    # Try to standardize by posterior SD
-    if (!is.null(object$jags_fit$mean) && "sigma" %in% names(object$jags_fit$mean)) {
-      sigma <- object$jags_fit$mean$sigma
-      # Expand sigma to match residuals dimensions if needed
-      if (length(sigma) == object$jags_data$Nparticipants) {
-        sigma_matrix <- matrix(rep(sigma, each = object$jags_data$Ntrials), 
-                              nrow = object$jags_data$Nparticipants, 
-                              ncol = object$jags_data$Ntrials, 
-                              byrow = TRUE)
-        residuals <- residuals / sigma_matrix
-      }
-    } else if (!is.null(object$jags_fit$summary)) {
-      sigma_rows <- grepl("^sigma\\[", rownames(object$jags_fit$summary))
-      if (any(sigma_rows)) {
-        sigma <- object$jags_fit$summary[sigma_rows, "mean"]
-        if (length(sigma) == object$jags_data$Nparticipants) {
-          sigma_matrix <- matrix(rep(sigma, each = object$jags_data$Ntrials), 
-                                nrow = object$jags_data$Nparticipants, 
-                                ncol = object$jags_data$Ntrials, 
-                                byrow = TRUE)
-          residuals <- residuals / sigma_matrix
-        }
-      }
-    }
+    sigma <- object$jags_fit$sims.list$sigma
+    gp <- object$jags_fit$sims.list$gp
+    if (is.null(sigma) || is.null(gp)) stop("sigma and gp samples are required for standardized residuals.")
+    sigma <- matrix(sigma, ncol = 2)
+    gp <- matrix(gp, ncol = nrow(result))
+    participant_sigma <- vapply(seq_len(nrow(result)), function(i) {
+      mean(sigma[cbind(seq_len(nrow(gp)), ifelse(gp[, i] == 1, 2L, 1L))])
+    }, numeric(1))
+    result <- result / participant_sigma
+  } else {
+    bounds <- object$rating_scale
+    if (is.null(bounds)) bounds <- attr(object$jags_data, "rating_scale")
+    if (!is.null(bounds)) result <- result * diff(bounds) / 10
   }
-  
-  return(residuals)
+  result
 }
 
-#' Fitted Values Method for mfeargen Objects
-#' 
-#' @param object A mfeargen object
-#' @param ... Additional arguments (ignored)
-#' @return Matrix of fitted values
-#' @export
-fitted.mfeargen <- function(object, ...) {
-  
-  # Check if we have y_pre (posterior predictive samples)
-  if (!is.null(object$jags_fit$sims.list) && "y_pre" %in% names(object$jags_fit$sims.list)) {
-    # y_pre could be in different formats depending on JAGS model
-    y_pre <- object$jags_fit$sims.list$y_pre
-    
-    # Check dimensions: could be (iterations, participants, trials) or (iterations, trials, participants)
-    if (length(dim(y_pre)) == 3) {
-      # If middle dimension matches Ntrials, it's likely (iter, trials, participants)
-      if (dim(y_pre)[2] == object$jags_data$Ntrials && dim(y_pre)[3] == object$jags_data$Nparticipants) {
-        # Need to transpose: (iter, trials, participants) -> (participants, trials)
-        theta_matrix <- apply(y_pre, c(3, 2), mean)  # Average over iterations
-      } else if (dim(y_pre)[2] == object$jags_data$Nparticipants && dim(y_pre)[3] == object$jags_data$Ntrials) {
-        # Already in (iter, participants, trials) format
-        theta_matrix <- apply(y_pre, c(2, 3), mean)  # Average over iterations
-      } else {
-        # Fallback: assume standard format
-        theta_matrix <- apply(y_pre, c(2, 3), mean)
-      }
-      return(theta_matrix)
-    }
-  }
-  
-  # Try to extract theta from summary
-  if (!is.null(object$jags_fit$summary)) {
-    theta_rows <- grepl("^theta\\[", rownames(object$jags_fit$summary))
-    if (any(theta_rows)) {
-      theta <- object$jags_fit$summary[theta_rows, "mean"]
-      # Create matrix (participants x trials)
-      theta_matrix <- matrix(theta, 
-                            nrow = object$jags_data$Nparticipants, 
-                            ncol = object$jags_data$Ntrials, 
-                            byrow = TRUE)
-      return(theta_matrix)
-    }
-  }
-  
-  # If no theta, return the observed data as a fallback
-  if (!is.null(object$jags_data$y)) {
-    return(object$jags_data$y)
-  }
-  
-  # No fitted values available
-  return(NULL)
-}
-
-#' Log-likelihood Method for mfeargen Objects
-#' 
-#' @param object A mfeargen object
-#' @param ... Additional arguments (ignored)
-#' @return Log-likelihood value
+#' Posterior mean conditional log likelihood
+#' @param object A fitted mfeargen model.
+#' @param ... Additional arguments (ignored).
+#' @return A logLik object. The parameter count is unavailable for this mixture
+#'   model, so df is NA; use calculate_waic for predictive comparison.
+#'   The likelihood is evaluated on the internal 0-10 rating scale.
 #' @export
 logLik.mfeargen <- function(object, ...) {
-  
-  # Extract log-likelihood from JAGS fit
-  loglik <- object$jags_fit$summary["total_loglik", "mean"]
-  
-  # Create logLik object
-  attr(loglik, "df") <- length(object$jags_fit$summary[, "mean"])  # Number of parameters
-  attr(loglik, "nobs") <- object$jags_data$Nparticipants * object$jags_data$Ntrials
-  
-  class(loglik) <- "logLik"
-  return(loglik)
+  ll <- object$jags_fit$mean$loglik
+  if (is.null(ll)) stop("Log likelihood was not monitored; refit with loglik monitoring.")
+  observed <- !is.na(object$jags_data$y)
+  value <- sum(ll[observed])
+  structure(value, class = "logLik", df = NA_integer_, nobs = sum(observed))
 }

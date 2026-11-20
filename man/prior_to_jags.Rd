@@ -10,6 +10,8 @@ prior_to_jags(prior, var_name = NULL, param_name = NULL)
 \item{prior}{A prior specification object}
 
 \item{var_name}{Character. Variable name in JAGS model}
+
+\item{param_name}{Character. Alias for var_name.}
 }
 \value{
 Character string of JAGS syntax

@@ -2,11 +2,16 @@
 % Please edit documentation in R/08b_hierarchical_fitting.R
 \name{prepare_hierarchical_data}
 \alias{prepare_hierarchical_data}
-\title{Prepare Hierarchical Data for JAGS}
+\title{Prepare Repeated-Session Data}
 \usage{
-prepare_hierarchical_data(data, model_type, lambda_criterion)
+prepare_hierarchical_data(
+  data,
+  model_type = "1cs",
+  lambda_criterion = 0.7,
+  rating_scale = NULL
+)
 }
 \description{
-Prepare Hierarchical Data for JAGS
+Prepare Repeated-Session Data
 }
 \keyword{internal}

@@ -2,16 +2,23 @@
 % Please edit documentation in R/model_comparison.R
 \name{calculate_waic}
 \alias{calculate_waic}
-\title{Calculate WAIC for mfeargen Models}
+\title{Calculate conditional trial-level WAIC}
 \usage{
 calculate_waic(fit_object)
 }
 \arguments{
-\item{fit_object}{A fitted mfeargen model}
+\item{fit_object}{A fitted mfeargen model with monitored loglik draws.}
 }
 \value{
-List with WAIC components
+WAIC, its standard error, effective parameter count, and pointwise
+contributions. Missing and padded observations are excluded.
 }
 \description{
-Calculates Watanabe-Akaike Information Criterion
+Calculate conditional trial-level WAIC
+}
+\details{
+Each observed rating is a predictive unit. This estimates prediction
+for fitted participants, conditional on their latent effects; it does not
+estimate prediction for new participants. Likelihoods are on the normalized
+0-10 rating scale and must only be compared across identical observations.
 }

@@ -2,18 +2,18 @@
 % Please edit documentation in R/methods.R
 \name{print.mfeargen}
 \alias{print.mfeargen}
-\title{Print Method for mfeargen Objects}
+\title{Print a fitted fear generalization model}
 \usage{
 \method{print}{mfeargen}(x, ...)
 }
 \arguments{
-\item{x}{A mfeargen object}
+\item{x}{A fitted mfeargen model.}
 
-\item{...}{Additional arguments (ignored)}
+\item{...}{Additional arguments (ignored).}
 }
 \value{
-Invisibly returns the input object
+The input, invisibly.
 }
 \description{
-Print Method for mfeargen Objects
+Print a fitted fear generalization model
 }

@@ -21,6 +21,9 @@ NULL
 #' @param prepared_data List. Pre-prepared JAGS data from prepare_mfeargen_data() (optional)
 #' @param parallel Logical. Run chains in parallel (default: TRUE)
 #' @param verbose Logical. Print progress messages (default: TRUE)
+#' @param rating_scale Numeric vector c(min, max). Known response scale bounds.
+#'   If omitted, uses simulation metadata or the observed range.
+#' @param seed Integer. Optional seed for initialization and sampling.
 #' @param ... Additional arguments passed to jagsUI
 #' 
 #' @return mfeargen object containing:
@@ -44,8 +47,8 @@ NULL
 #' summary(fit)
 #' plot(fit)
 #' }
-fit_mfeargen <- function(data, 
-                        model_type = c("1cs", "2cs"), 
+fit_mfeargen <- function(data,
+                        model_type = c("1cs", "2cs"),
                         n.iter = 10000,
                         n.burnin = 5000,
                         n.chains = 3,
@@ -55,152 +58,194 @@ fit_mfeargen <- function(data,
                         prepared_data = NULL,
                         parallel = TRUE,
                         verbose = TRUE,
+                        rating_scale = NULL,
+                        seed = NULL,
                         ...) {
-  
-  # Validate arguments
   model_type <- match.arg(model_type)
-  
-  if (!is.data.frame(data)) {
-    stop("Data must be a data frame")
-  }
-  
-  if (n.iter <= n.burnin) {
-    stop("n.iter must be greater than n.burnin")
-  }
-  
-  # Determine if using flexible priors
-  use_flexible_priors <- !is.null(priors)
-  
-  # Prepare data for JAGS
-  if (!is.null(prepared_data)) {
-    if (!is.list(prepared_data)) {
-      stop("prepared_data must be a list created by prepare_mfeargen_data()")
+  if (!is.data.frame(data)) stop("data must be a data frame")
+  counts <- list(n.iter = n.iter, n.burnin = n.burnin,
+                 n.chains = n.chains, n.thin = n.thin)
+  for (nm in names(counts)) {
+    value <- counts[[nm]]
+    minimum <- if (nm == "n.burnin") 0 else 1
+    if (!is.numeric(value) || length(value) != 1L || !is.finite(value) ||
+        value != floor(value) || value < minimum) {
+      stop(nm, " must be a whole number >= ", minimum)
     }
-    jags_data <- prepared_data
-    if (verbose) message("Using supplied prepared data for JAGS.")
-  } else {
+  }
+  if (n.iter <= n.burnin) stop("n.iter must be greater than n.burnin")
+  if (floor((n.iter - n.burnin) / n.thin) < 2) {
+    stop("Sampling settings must retain at least two draws per chain")
+  }
+  for (nm in c("parallel", "verbose")) {
+    value <- get(nm)
+    if (!is.logical(value) || length(value) != 1L || is.na(value)) {
+      stop(nm, " must be TRUE or FALSE")
+    }
+  }
+  if (!is.null(priors)) validate_priors(priors)
+  dots <- list(...)
+  reserved <- intersect(names(dots), c("data", "inits", "parameters.to.save", "model.file"))
+  if (length(reserved)) stop("Reserved JAGS arguments: ", paste(reserved, collapse = ", "))
+  if (isTRUE(dots$codaOnly)) stop("codaOnly = TRUE is incompatible with mfeargen post-processing")
+  dic <- dots$DIC %||% TRUE
+  dots$DIC <- NULL
+  if (!is.null(seed)) {
+    if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
+        seed < 0 || seed > .Machine$integer.max || seed != floor(seed)) {
+      stop("seed must be a non-negative integer")
+    }
+    had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    if (had_seed) old_seed <- get(".Random.seed", envir = .GlobalEnv)
+    on.exit({
+      if (had_seed) assign(".Random.seed", old_seed, envir = .GlobalEnv)
+      else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+        rm(".Random.seed", envir = .GlobalEnv)
+      }
+    }, add = TRUE)
+    set.seed(seed)
+  }
+
+  if (is.null(prepared_data)) {
     if (verbose) message("Preparing data for JAGS...")
-    jags_data <- prepare_mfeargen_data(data, model_type, lambda_criterion, 
-                                      rating_scale = NULL,
-                                      priors = priors,
-                                      use_flexible_priors = use_flexible_priors)
-  }
-  
-  # Set up model file based on whether using flexible priors
-  if (use_flexible_priors) {
-    model_file <- system.file("jags", paste0("model_", model_type, "_flexible.txt"), 
-                             package = "mfeargen")
-    if (verbose) message("Using flexible prior model")
+    jags_data <- prepare_mfeargen_data(
+      data, model_type, lambda_criterion, rating_scale = rating_scale
+    )
   } else {
-    model_file <- system.file("jags", paste0("model_", model_type, ".txt"), 
-                             package = "mfeargen")
+    jags_data <- prepared_data
+    validate_prepared_data(jags_data, model_type)
+    if (!is.null(rating_scale) &&
+        !isTRUE(all.equal(as.numeric(rating_scale), as.numeric(attr(jags_data, "rating_scale") %||% jags_data$rating_scale)))) {
+      stop("rating_scale does not match prepared_data$rating_scale")
+    }
   }
-  
-  if (!file.exists(model_file)) {
-    stop("JAGS model file not found: ", model_file)
+  validate_prepared_data(jags_data, model_type)
+
+  model_file <- system.file("jags", paste0("model_", model_type, ".txt"),
+                            package = "mfeargen")
+  if (!nzchar(model_file) || !file.exists(model_file)) {
+    stop("JAGS model file not found; reinstall mfeargen")
   }
-  
-  # Initialize parameters
-  if (verbose) message("Initializing MCMC parameters...")
+  model_text <- readLines(model_file, warn = FALSE)
+  if (!is.null(priors)) {
+    model_text <- apply_model_priors(model_text, priors)
+    model_file <- tempfile("mfeargen-", fileext = ".txt")
+    writeLines(model_text, model_file)
+    on.exit(unlink(model_file), add = TRUE)
+  }
   inits <- initialize_mcmc_parameters(jags_data, n.chains)
-  
-  # Parameters to monitor
-  parameters <- c("alpha", "lambda", "gp", "pi", "w0", "w1", "sigma")
-  
-  # Run MCMC
+  parameters <- c("alpha", "lambda", "gp", "pi", "w0", "w1", "sigma",
+                  "theta", "loglik", "y_pre", "alpha_mu", "alpha_kappa",
+                  "lambda_mu", "lambda_sigma", "w0_mu", "w0_sigma", "w1_a", "w1_b")
+  # Prior metadata belongs to the R object, not JAGS' data environment.
+  sampling_data <- jags_data[!grepl("^prior_", names(jags_data))]
   if (verbose) message("Running MCMC sampling...")
-  
-  fit <- jags(
-    data = jags_data,
-    inits = inits,
-    parameters.to.save = parameters,
-    model.file = model_file,
-    n.chains = n.chains,
-    n.iter = n.iter,
-    n.burnin = n.burnin,
-    n.thin = n.thin,
-    parallel = parallel,
-    DIC = TRUE,
-    ...
-  )
-  
-  # Post-processing
-  if (verbose) message("Post-processing results...")
-  
-  # Extract group membership
-  group_membership <- extract_group_membership(fit)
-  
-  # Check convergence
+  fit <- do.call(jagsUI::jags, c(list(
+    data = sampling_data, inits = inits, parameters.to.save = parameters,
+    model.file = model_file, n.chains = n.chains, n.iter = n.iter,
+    n.burnin = n.burnin, n.thin = n.thin, parallel = parallel,
+    DIC = dic, verbose = verbose
+  ), dots))
+  participants <- attr(jags_data, "participants")
+  if (is.null(participants)) participants <- unique(data$participant)
+  group_membership <- extract_group_membership(fit, participants)
   convergence <- check_convergence(fit, verbose = verbose)
-  
-  # Create mfeargen object
-  mfeargen_fit <- list(
-    jags_fit = fit,
-    model_type = model_type,
-    data = data,
-    jags_data = jags_data,
-    group_membership = group_membership,
-    lambda_threshold = jags_data$lambda_threshold,
-    convergence = convergence,
-    n.iter = n.iter,
-    n.burnin = n.burnin,
-    n.chains = n.chains,
-    call = match.call()
+  result <- list(
+    jags_fit = fit, model_type = model_type, data = data, jags_data = jags_data,
+    group_membership = group_membership, lambda_threshold = jags_data$lambda_threshold,
+    convergence = convergence, rating_scale = attr(jags_data, "rating_scale") %||% jags_data$rating_scale,
+    n.iter = n.iter, n.burnin = n.burnin,
+    n.chains = n.chains, n.thin = n.thin, seed = seed, priors = priors,
+    model_code = model_text, call = match.call()
   )
-  
-  class(mfeargen_fit) <- "mfeargen"
-  
-  if (verbose) {
-    message("Model fitting complete!")
-    message("  Model type: ", model_type)
-    message("  Participants: ", jags_data$Nparticipants)
-    message("  Trials: ", jags_data$Ntrials)
-    message("  Convergence: ", ifelse(convergence$converged, "Yes", "No"))
-  }
-  
-  return(mfeargen_fit)
+  class(result) <- "mfeargen"
+  if (verbose) message("Model fitting complete (", jags_data$Nparticipants, " participants).")
+  result
 }
 
+validate_prepared_data <- function(jags_data, model_type) {
+  if (!is.list(jags_data)) {
+    stop("prepared_data must be a list created by prepare_mfeargen_data()")
+  }
+  required <- c("y", "Nparticipants", "Ntrials", "rating_scale", "lambda_threshold")
+  required <- c(required, if (model_type == "1cs") {
+    c("k", "r", "d_phy", "d_per_old")
+  } else {
+    c("k_plus", "k_minus", "r_plus", "r_minus", "d_p_phy", "d_m_phy", "d_p_per", "d_m_per")
+  })
+  missing <- setdiff(required, names(jags_data))
+  if (length(missing)) stop("prepared_data is missing: ", paste(missing, collapse = ", "))
+  for (nm in c("Nparticipants", "Ntrials")) {
+    value <- jags_data[[nm]]
+    if (!is.numeric(value) || length(value) != 1L || !is.finite(value) ||
+        value < 1 || value != floor(value)) stop("Invalid prepared_data$", nm)
+  }
+  validate_rating_scale(jags_data$rating_scale)
+  if (!identical(as.numeric(jags_data$rating_scale), c(0, 10))) {
+    stop("prepared_data must use the normalized 0-10 scale; recreate it with prepare_mfeargen_data()")
+  }
+  declared_type <- attr(jags_data, "model_type")
+  if (!is.null(declared_type) && declared_type != model_type) {
+    stop("model_type does not match prepared_data")
+  }
+  expected <- c(jags_data$Nparticipants, jags_data$Ntrials)
+  for (nm in setdiff(required, c("Nparticipants", "Ntrials", "rating_scale", "lambda_threshold"))) {
+    value <- jags_data[[nm]]
+    if (!is.numeric(value) || !identical(as.integer(dim(value)), as.integer(expected)) ||
+        any(is.infinite(value)) || (nm != "y" && anyNA(value))) {
+      stop("Invalid prepared_data$", nm, "; expected a numeric participant-by-trial matrix")
+    }
+  }
+  scale <- jags_data$rating_scale
+  if (!is.numeric(scale) || length(scale) != 2L || any(!is.finite(scale)) || scale[1] >= scale[2]) {
+    stop("prepared_data$rating_scale must have two finite increasing bounds")
+  }
+  if (!is.numeric(jags_data$lambda_threshold) || length(jags_data$lambda_threshold) != 1L ||
+      !is.finite(jags_data$lambda_threshold) || jags_data$lambda_threshold <= 0) {
+    stop("prepared_data$lambda_threshold must be positive")
+  }
+  invisible(TRUE)
+}
+
+apply_model_priors <- function(model_text, priors) {
+  validate_priors(priors)
+  nodes <- c(lambda_mu = "lambda_mu", lambda_sigma = "lambda_sigma",
+             alpha_mu = "alpha_mu", alpha_kappa = "alpha_kappa",
+             sigma1 = "sigma[1]", sigma2 = "sigma[2]", pi = "pi[1:4]",
+             w0_mu = "w0_mu", w0_sigma = "w0_sigma", w1_a = "w1_a", w1_b = "w1_b")
+  for (nm in names(nodes)) {
+    node <- nodes[[nm]]
+    line <- which(startsWith(trimws(model_text), paste0(node, " ~")))
+    if (length(line) != 1L) stop("Cannot locate prior for ", nm)
+    prior <- priors[[nm]]
+    if (nm == "lambda_mu" && prior$dist == "norm" && is.null(prior$truncate)) {
+      prior$truncate <- c(0, Inf)
+    }
+    if (nm == "alpha_mu") prior$truncate <- c(1e-9, 1 - 1e-9)
+    model_text[line] <- paste0("  ", prior_to_jags(prior, node))
+  }
+  model_text
+}
 
 #' Initialize MCMC Parameters
 #'
-#' @description
-#' Creates initial values for MCMC chains to improve convergence.
-#'
-#' @param jags_data List. Prepared JAGS data
-#' @param n.chains Integer. Number of chains
-#' @return List of initial values for each chain
+#' @param jags_data List. Prepared JAGS data.
+#' @param n.chains Integer. Number of chains.
+#' @return List of initial values for each chain.
 #' @keywords internal
 initialize_mcmc_parameters <- function(jags_data, n.chains) {
-  
-  n_participants <- jags_data$Nparticipants
-  
-  inits <- list()
-  
-  for (chain in 1:n.chains) {
-    inits[[chain]] <- list(
-      alpha_1 = runif(n_participants, 0.1, 0.9),
-      lambda_1 = runif(n_participants, 
-                      jags_data$lambda_threshold, 
-                      jags_data$lambda_threshold * 3),
-      lambda_2 = runif(n_participants, 0, jags_data$lambda_threshold),
-      w0 = rnorm(n_participants, 0, 1),
-      w1_1 = rgamma(n_participants, 2, 1) + 1,
-      gp = sample(1:4, n_participants, replace = TRUE),
-      pi = rep(0.25, 4),
-      alpha_mu = runif(1, 0.3, 0.7),
-      alpha_kappa = runif(1, 2, 8),
-      lambda_mu = runif(1, 0.05, 0.15),
-      lambda_sigma = runif(1, 0.01, 0.1),
-      w0_mu = rnorm(1, 0, 0.5),
-      w0_sigma = rgamma(1, 2, 1),
-      w1_a = rgamma(1, 2, 1),
-      w1_b = rgamma(1, 2, 1),
-      sigma = c(runif(1, 0.5, 1.5), runif(1, 1.5, 3))
+  n <- jags_data$Nparticipants
+  lapply(seq_len(n.chains), function(chain) {
+    list(
+      alpha_1 = runif(n, 0.2, 0.8),
+      lambda_1 = runif(n, 1.1, 3) * jags_data$lambda_threshold,
+      lambda_2 = runif(n, 0.1, 0.9) * jags_data$lambda_threshold,
+      w0 = rnorm(n, 0, 0.5), w1_1 = runif(n, 1.1, 3),
+      gp = sample.int(4L, n, replace = TRUE), pi = rep(0.25, 4),
+      .RNG.name = "base::Mersenne-Twister",
+      .RNG.seed = sample.int(.Machine$integer.max, 1)
     )
-  }
-  
-  return(inits)
+  })
 }
 
 
@@ -210,56 +255,28 @@ initialize_mcmc_parameters <- function(jags_data, n.chains) {
 #' Extracts the most probable group membership for each participant.
 #'
 #' @param fit JAGS output object
+#' @param participants Original participant identifiers.
 #' @return Data frame with group assignments and probabilities
 #' @keywords internal
-extract_group_membership <- function(fit) {
-  
-  if ("gp" %in% names(fit$mean)) {
-    # Get posterior mean group assignments
-    group_means <- fit$mean$gp
-    n_participants <- length(group_means)
-    
-    # Round to get most probable group
-    group_assignment <- round(group_means)
-    
-    # Get posterior samples for uncertainty
-    if ("gp" %in% names(fit$sims.list)) {
-      gp_samples <- fit$sims.list$gp
-      
-      # Calculate probability of each group for each participant
-      group_probs <- matrix(0, n_participants, 4)
-      for (i in 1:n_participants) {
-        for (g in 1:4) {
-          group_probs[i, g] <- mean(gp_samples[, i] == g)
-        }
-      }
-      
-      colnames(group_probs) <- paste0("prob_group_", 1:4)
-      
-    } else {
-      group_probs <- NULL
-    }
-    
-    # Create output data frame
-    membership <- data.frame(
-      participant = 1:n_participants,
-      group = group_assignment,
-      group_label = c("Non-Learner", "Overgeneralizer", 
-                     "Physical", "Perceptual")[group_assignment],
-      assigned_group = c("Non-Learner", "Overgeneralizer", 
-                        "Physical", "Perceptual")[group_assignment]
-    )
-    
-    if (!is.null(group_probs)) {
-      membership <- cbind(membership, group_probs)
-    }
-    
-    return(membership)
-    
-  } else {
-    warning("Group membership (gp) not found in model output")
+extract_group_membership <- function(fit, participants = NULL) {
+  samples <- fit$sims.list$gp
+  if (is.null(samples)) {
+    warning("Group membership samples (gp) not found in model output")
     return(NULL)
   }
+  if (is.null(dim(samples))) samples <- matrix(samples, ncol = 1L)
+  n <- ncol(samples)
+  if (is.null(participants)) participants <- seq_len(n)
+  if (length(participants) != n) stop("Participant IDs do not match group samples")
+  probs <- vapply(seq_len(4L), function(group) colMeans(samples == group), numeric(n))
+  probs <- matrix(probs, nrow = n, ncol = 4L)
+  groups <- max.col(probs, ties.method = "first")
+  labels <- c("Non-Learner", "Overgeneralizer", "Physical", "Perceptual")
+  membership <- data.frame(participant = participants, group = groups,
+                           group_label = labels[groups], assigned_group = labels[groups],
+                           max_probability = apply(probs, 1L, max))
+  colnames(probs) <- paste0("prob_group_", seq_len(4L))
+  cbind(membership, probs)
 }
 
 
@@ -274,65 +291,34 @@ extract_group_membership <- function(fit) {
 #' @return List with convergence information
 #' @export
 check_convergence <- function(fit, threshold = 1.1, verbose = TRUE) {
-  
-  # If fit is a numeric vector (Rhat values directly), use the helper function
+  validate_scalar(threshold, "threshold", 1)
+  if (inherits(fit, "mfeargen")) fit <- fit$jags_fit
   if (is.numeric(fit)) {
-    result <- check_mcmc_convergence(fit, threshold)
-    return(result)
-  }
-  
-  # Handle mfeargen objects
-  if (inherits(fit, "mfeargen")) {
-    fit <- fit$jags_fit
-  }
-  
-  # Extract Rhat values from JAGS fit object
-  rhat_values <- NULL
-  
-  # Try different locations for Rhat values
-  if ("Rhat" %in% names(fit)) {
-    # jagsUI output format - Rhat is a list
-    rhat_values <- unlist(fit$Rhat)
-  } else if (!is.null(fit$BUGSoutput) && !is.null(fit$BUGSoutput$summary)) {
-    # Standard JAGS/BUGS output location
-    if ("Rhat" %in% colnames(fit$BUGSoutput$summary)) {
-      rhat_values <- fit$BUGSoutput$summary[, "Rhat"]
-    }
+    rhat <- fit
+  } else if (!is.null(fit$Rhat)) {
+    rhat <- unlist(fit$Rhat)
   } else if (!is.null(fit$summary) && "Rhat" %in% colnames(fit$summary)) {
-    # In summary
-    rhat_values <- fit$summary[, "Rhat"]
-  }
-  
-  # Process Rhat values
-  if (!is.null(rhat_values)) {
-    rhat_values <- rhat_values[!is.na(rhat_values)]
-    
-    if (length(rhat_values) == 0) {
-      if (verbose) warning("No valid Rhat values found")
-      return(list(converged = NA, max_rhat = NA))
-    }
-    
-    max_rhat <- max(rhat_values, na.rm = TRUE)
-    converged <- all(rhat_values < threshold, na.rm = TRUE)
-    
-    if (verbose && !converged) {
-      n_poor <- sum(rhat_values >= threshold, na.rm = TRUE)
-      message("Warning: ", n_poor, " parameters have Rhat >= ", threshold)
-      message("         Maximum Rhat: ", round(max_rhat, 3))
-      message("         Consider increasing n.iter or n.burnin")
-    }
-    
-    return(list(
-      converged = converged,
-      max_rhat = max_rhat,
-      n_parameters = length(rhat_values),
-      n_poor_convergence = sum(rhat_values >= threshold, na.rm = TRUE)
-    ))
-    
+    rhat <- fit$summary[, "Rhat"]
+  } else if (!is.null(fit$BUGSoutput$summary) &&
+             "Rhat" %in% colnames(fit$BUGSoutput$summary)) {
+    rhat <- fit$BUGSoutput$summary[, "Rhat"]
   } else {
-    if (verbose) warning("Rhat values not found in model output")
-    return(list(converged = NA, max_rhat = NA))
+    rhat <- numeric(0)
   }
+  rhat <- rhat[!is.na(rhat)]
+  result <- list(
+    converged = if (length(rhat)) all(rhat < threshold) else NA,
+    max_rhat = if (length(rhat)) max(rhat) else NA_real_,
+    n_parameters = length(rhat), n_poor_convergence = sum(rhat >= threshold)
+  )
+  if (verbose && identical(result$converged, FALSE)) {
+    message(result$n_poor_convergence, " parameters have Rhat >= ", threshold,
+            "; maximum Rhat = ", round(result$max_rhat, 3), ".")
+  }
+  if (verbose && is.na(result$converged)) {
+    message("Rhat is unavailable; convergence cannot be assessed.")
+  }
+  result
 }
 
 
@@ -352,6 +338,9 @@ check_convergence <- function(fit, threshold = 1.1, verbose = TRUE) {
 #' alpha_params <- extract_parameters(fit, "alpha")
 #' }
 extract_parameters <- function(fit, parameter = "all", summary_only = TRUE) {
+  if (!is.character(parameter) || length(parameter) != 1L || is.na(parameter)) {
+    stop("parameter must be one parameter name or 'all'")
+  }
   
   # Handle mfeargen object
   if (inherits(fit, "mfeargen")) {

@@ -2,11 +2,11 @@
 % Please edit documentation in R/08b_hierarchical_fitting.R
 \name{check_hierarchical_convergence}
 \alias{check_hierarchical_convergence}
-\title{Check Hierarchical Model Convergence}
+\title{Check Repeated-Session Convergence}
 \usage{
 check_hierarchical_convergence(jags_fit)
 }
 \description{
-Check Hierarchical Model Convergence
+Check Repeated-Session Convergence
 }
 \keyword{internal}
