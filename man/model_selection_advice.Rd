@@ -2,16 +2,16 @@
 % Please edit documentation in R/model_comparison.R
 \name{model_selection_advice}
 \alias{model_selection_advice}
-\title{Model Selection Helper}
+\title{Describe the model comparison result}
 \usage{
 model_selection_advice(comparison_result)
 }
 \arguments{
-\item{comparison_result}{A mfeargen_comparison object}
+\item{comparison_result}{A mfeargen_comparison object.}
 }
 \value{
-Character string with model selection advice
+A brief description of the criterion difference.
 }
 \description{
-Provides guidance on model selection based on comparison results
+Describe the model comparison result
 }

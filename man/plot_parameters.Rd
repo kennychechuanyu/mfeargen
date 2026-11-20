@@ -15,5 +15,5 @@ plot_parameters(fit, parameter = "alpha")
 ggplot object
 }
 \description{
-Creates density plots of parameter distributions
+Shows the distribution of posterior participant means.
 }

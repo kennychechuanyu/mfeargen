@@ -2,21 +2,20 @@
 % Please edit documentation in R/08_hierarchical_model.R
 \name{plot_hierarchical_structure}
 \alias{plot_hierarchical_structure}
-\title{Plot Hierarchical Structure}
+\title{Plot Stable and Session Parameters}
 \usage{
 plot_hierarchical_structure(fit, parameter = "alpha", n_individuals = 10)
 }
 \arguments{
-\item{fit}{mfeargen_hierarchical object}
+\item{fit}{An \code{mfeargen_hierarchical} object.}
 
-\item{parameter}{Character. Parameter to visualize}
+\item{parameter}{Parameter to visualize.}
 
-\item{n_individuals}{Integer. Number of individuals to show (default: 10)}
+\item{n_individuals}{Maximum number of participants to display.}
 }
 \value{
-ggplot object
+A ggplot object.
 }
 \description{
-Creates a visual representation of the three-level hierarchical model
-structure, showing population, individual, and session levels.
+Plots posterior means and 95\% intervals for actual participants and sessions.
 }

@@ -2,46 +2,18 @@
 % Please edit documentation in R/08_hierarchical_model.R
 \name{hierarchical_structure}
 \alias{hierarchical_structure}
-\title{Three-Level Hierarchical Model Structure}
+\title{Repeated-Session Model Structure}
 \description{
-The mfeargen package implements a three-level hierarchical Bayesian model
-that separates population-level distributions, individual stable components
-(between-person differences), and session-specific realizations (within-person
-variation).
+The repeated-session model separates population locations, stable participant
+components, and session-specific parameters. Learning rates are bounded by
+zero and one, response slopes are positive, and group membership constrains
+generalization gradients. Sessions share a participant's latent group but
+have separate conditioning histories.
 }
 \details{
-## Model Hierarchy
-
-### Level 1: Population Distributions (Hyperparameters)
-- \eqn{\mu_\alpha, \tau^2_\alpha}: Population mean and variance for learning rates
-- \eqn{\mu_\lambda, \tau^2_\lambda}: Population mean and variance for generalization
-- \eqn{\mu_{\beta_0}, \tau^2_{\beta_0}}: Population mean and variance for intercepts
-- \eqn{\mu_{\beta_1}, \tau^2_{\beta_1}}: Population mean and variance for slopes
-
-### Level 2: Individual Stable Components (Between-Person)
-- \eqn{\alpha^{stable}_i \sim \mathcal{N}(\mu_\alpha, \tau^2_\alpha)}
-- \eqn{\lambda^{stable}_i \sim \mathcal{N}(\mu_\lambda, \tau^2_\lambda)}
-- \eqn{\beta^{stable}_{0,i} \sim \mathcal{N}(\mu_{\beta_0}, \tau^2_{\beta_0})}
-- \eqn{\beta^{stable}_{1,i} \sim \mathcal{N}(\mu_{\beta_1}, \tau^2_{\beta_1})}
-
-### Level 3: Session-Specific Realizations (Within-Person)
-- \eqn{\alpha_{i,t} \sim \mathcal{N}(\alpha^{stable}_i, \sigma^2_\alpha)}
-- \eqn{\lambda_{i,t} \sim \mathcal{N}(\lambda^{stable}_i, \sigma^2_\lambda)}
-- \eqn{\beta_{0,i,t} \sim \mathcal{N}(\beta^{stable}_{0,i}, \sigma^2_{\beta_0})}
-- \eqn{\beta_{1,i,t} \sim \mathcal{N}(\beta^{stable}_{1,i}, \sigma^2_{\beta_1})}
-
-## Variance Components
-
-- **Between-person variance** (\eqn{\tau^2}): How much individuals differ in stable traits
-- **Within-person variance** (\eqn{\sigma^2}): How much individuals vary across sessions
-- **Individual means** (\eqn{\theta^{stable}_i}): Person i's characteristic value
-- **Session deviations** (\eqn{\delta_{i,t} = \theta_{i,t} - \theta^{stable}_i})
-
-## Stability Metrics
-
-Stability = \eqn{\tau^2 / (\tau^2 + \sigma^2)}
-
-- High stability (>0.7): Most variance is between people
-- Moderate stability (0.3-0.7): Mixed between/within variance
-- Low stability (<0.3): Most variance is within people
+Variance parameters describe the underlying normal distributions before
+truncation and group constraints. The ratio
+\eqn{\tau^2 / (\tau^2 + \sigma^2)} summarizes between-person variance
+relative to between-person plus session variance on that underlying scale.
+It is not the empirical intraclass correlation of constrained parameters.
 }

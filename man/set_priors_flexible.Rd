@@ -27,9 +27,9 @@ set_priors_flexible(
 
 \item{alpha_kappa}{Prior for alpha_kappa (from prior_uniform)}
 
-\item{sigma1}{Prior for sigma[1] (from prior_uniform)}
+\item{sigma1}{Prior for \code{sigma[1]} (from prior_uniform)}
 
-\item{sigma2}{Prior for sigma[2] (from prior_uniform)}
+\item{sigma2}{Prior for \code{sigma[2]} (from prior_uniform)}
 
 \item{pi}{Prior for group probabilities (from prior_dirichlet)}
 

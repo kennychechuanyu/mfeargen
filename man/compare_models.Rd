@@ -2,30 +2,19 @@
 % Please edit documentation in R/model_comparison.R
 \name{compare_models}
 \alias{compare_models}
-\title{Model Comparison Utilities for mfeargen}
+\title{Compare models fitted to the same observations}
 \usage{
-compare_models(..., criterion = "DIC")
+compare_models(..., criterion = c("DIC", "WAIC"))
 }
 \arguments{
-\item{...}{Fitted mfeargen model objects}
+\item{...}{Two or more fitted mfeargen models.}
 
-\item{criterion}{Character. Comparison criterion ("DIC", "WAIC", "LOO")}
+\item{criterion}{Either "DIC" or "WAIC". WAIC uses individual observed
+ratings as predictive units, conditional on participant effects.}
 }
 \value{
-Data frame with model comparison results
+A comparison data frame, ordered by the selected criterion.
 }
 \description{
-Functions for comparing different model fits and selecting the best model
-Compare mfeargen Models
-}
-\details{
-Compares multiple fitted mfeargen models using information criteria
-}
-\examples{
-\dontrun{
-fit1 <- fit_mfeargen(data, model_type = "1cs")
-fit2 <- fit_mfeargen(data, model_type = "2cs")
-comparison <- compare_models(fit1, fit2)
-print(comparison)
-}
+Compare models fitted to the same observations
 }

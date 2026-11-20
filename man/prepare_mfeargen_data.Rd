@@ -14,24 +14,34 @@ prepare_mfeargen_data(
 )
 }
 \arguments{
-\item{data}{Data frame with fear generalization data}
+\item{data}{Data frame with participant, trials and US_expect, plus observed
+reinforcement outcomes (US for 1cs; USp and signed USm for 2cs). USm=-1
+denotes an inhibitory target, 0 no target, and 1 an excitatory target.
+Supply stimulus_type, Phy_size and Per_size, or explicit trial indicators
+and distance columns. When phase is supplied, learning updates occur
+during conditioning only.}
 
 \item{model_type}{Character. "1cs" or "2cs"}
 
 \item{lambda_criterion}{Numeric. Criterion for lambda threshold (default: 0.7)}
 
-\item{rating_scale}{Numeric vector. Rating scale range (optional)}
+\item{rating_scale}{Numeric vector c(min, max). Uses simulation metadata
+when available, otherwise the observed range. Specify the experimental
+scale explicitly when participants did not use its full range.}
 
-\item{priors}{mfeargen_priors object from set_priors() (optional)}
+\item{priors}{Must be NULL; supply priors to fit_mfeargen instead.}
 
-\item{use_flexible_priors}{Logical. Use flexible prior model (default: FALSE)}
+\item{use_flexible_priors}{Must be FALSE; supply priors to fit_mfeargen instead.}
 }
 \value{
 List formatted for JAGS
 }
 \description{
 Prepares data in the format required by JAGS for model fitting.
-Handles both 1CS and 2CS models.
+Handles both 1CS and 2CS models. Responses are rescaled internally to 0-10;
+the original bounds and participant/trial mapping are stored as attributes.
+Unequal trial counts are padded after the last trial. Missing ratings are
+allowed when reinforcement and stimulus covariates are observed.
 }
 \examples{
 data <- simulate_mfeargen(n_participants = 10)

@@ -21,7 +21,7 @@ calculate_lambda_threshold(
 Numeric. The calculated lambda threshold
 }
 \description{
-Calculates the lambda threshold for exponential similarity function based on 
+Calculates the lambda threshold for exponential similarity function based on
 maximum distance and criterion similarity level.
 }
 \details{

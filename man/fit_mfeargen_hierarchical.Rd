@@ -2,7 +2,7 @@
 % Please edit documentation in R/08b_hierarchical_fitting.R
 \name{fit_mfeargen_hierarchical}
 \alias{fit_mfeargen_hierarchical}
-\title{Fit Hierarchical mfeargen Model}
+\title{Fit a Repeated-Session Fear Generalization Model}
 \usage{
 fit_mfeargen_hierarchical(
   data,
@@ -15,57 +15,61 @@ fit_mfeargen_hierarchical(
   priors = NULL,
   parallel = TRUE,
   verbose = TRUE,
+  rating_scale = NULL,
+  seed = NULL,
   ...
 )
 }
 \arguments{
-\item{data}{Data frame with hierarchical structure including session information}
+\item{data}{Trial-level data accepted by \code{\link[=prepare_mfeargen_data]{prepare_mfeargen_data()}}, with an
+additional \code{session} column. Trial numbers must be unique within each
+participant and session.}
 
-\item{model_type}{Character. "1cs" or "2cs"}
+\item{model_type}{Only \code{"1cs"} is currently supported.}
 
-\item{n.iter}{Integer. Number of MCMC iterations (default: 20000)}
+\item{n.iter}{Total iterations per chain, including burn-in.}
 
-\item{n.burnin}{Integer. Number of burn-in iterations (default: 10000)}
+\item{n.burnin}{Burn-in iterations per chain.}
 
-\item{n.chains}{Integer. Number of MCMC chains (default: 3)}
+\item{n.chains}{Number of MCMC chains.}
 
-\item{n.thin}{Integer. Thinning interval (default: 5)}
+\item{n.thin}{Thinning interval.}
 
-\item{lambda_criterion}{Numeric. Criterion for overgeneralization boundary}
+\item{lambda_criterion}{Similarity at the overgeneralization boundary.}
 
-\item{priors}{mfeargen_priors object for population hyperpriors}
+\item{priors}{Reserved for future use. Custom hierarchical priors are not
+supported; a non-NULL value produces an error.}
 
-\item{parallel}{Logical. Run chains in parallel (default: TRUE)}
+\item{parallel}{Run chains in parallel.}
 
-\item{verbose}{Logical. Print progress messages (default: TRUE)}
+\item{verbose}{Print sampler progress and diagnostics.}
 
-\item{...}{Additional arguments passed to jagsUI}
+\item{rating_scale}{Numeric vector containing the original rating bounds.}
+
+\item{seed}{Optional integer seed for reproducible initialization and sampling.}
+
+\item{...}{Additional arguments passed to \code{\link[jagsUI:jags]{jagsUI::jags()}}.}
 }
 \value{
-mfeargen_hierarchical object
+An \code{mfeargen_hierarchical} object containing posterior samples,
+participant and session mappings, convergence diagnostics, and variance
+summaries. Variance ratios describe the underlying normal distributions;
+truncation and group-specific parameter constraints affect realized variance.
 }
 \description{
-Fits a three-level hierarchical Bayesian mixture model that separates
-population-level distributions, individual stable components, and 
-session-specific variation.
+Fits a single-cue mixture model with population parameters, stable participant
+components, and session-specific parameters. Each session starts with zero
+associative strength. Ratings are modeled on an internal 0-10 scale.
 }
 \examples{
 \dontrun{
-# Simulate hierarchical data
-data <- simulate_mfeargen_hierarchical(
-  n_participants = 20,
-  n_sessions = c(2, 3, 2)  # Variable sessions per participant
-)
-
-# Fit hierarchical model
-fit <- fit_mfeargen_hierarchical(
-  data = data,
-  model_type = "1cs",
-  n.iter = 10000
-)
-
-# Analyze variance components
-var_decomp <- calculate_variance_decomposition(fit)
+first <- simulate_mfeargen(n_participants = 6, seed = 1)
+second <- simulate_mfeargen(n_participants = 6, seed = 2)
+first$session <- "first"
+second$session <- "second"
+repeated <- rbind(first, second)
+fit <- fit_mfeargen_hierarchical(repeated, rating_scale = c(1, 10))
+calculate_variance_decomposition(fit)
 plot_hierarchical_structure(fit)
 }
 }

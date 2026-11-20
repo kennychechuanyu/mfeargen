@@ -1,6 +1,26 @@
-#' @noRd
+validate_scalar <- function(x, name, lower = -Inf, upper = Inf, integer = FALSE,
+                            lower_open = FALSE, upper_open = FALSE) {
+  valid <- is.numeric(x) && length(x) == 1L && !is.na(x) && is.finite(x)
+  if (valid) {
+    valid <- (if (lower_open) x > lower else x >= lower) &&
+      (if (upper_open) x < upper else x <= upper) &&
+      (!integer || x == floor(x))
+  }
+  if (!valid) stop(name, " must be a finite ", if (integer) "integer" else "number",
+                   " in ", if (lower_open) "(" else "[", lower, ", ", upper,
+                   if (upper_open) ")" else "]", call. = FALSE)
+  invisible(x)
+}
 
-# validate_mfeargen_data moved to data.R to avoid duplication
+validate_rating_scale <- function(scale) {
+  if (!is.numeric(scale) || length(scale) != 2L || anyNA(scale) ||
+      any(!is.finite(scale)) || scale[1] >= scale[2]) {
+    stop("rating_scale must contain two finite, increasing bounds", call. = FALSE)
+  }
+  invisible(scale)
+}
+
+#' @noRd
 
 # Internal helper functions (not exported)
 #' @noRd
@@ -172,30 +192,15 @@ scale_to_range <- function(x, new_min = 0, new_max = 1) {
 #' 
 #' @export
 calculate_lambda_threshold <- function(max_distance = NULL, criterion = 0.7, stimulus_range = NULL) {
-  # Input validation
-  if (is.null(max_distance) && is.null(stimulus_range)) {
-    stop("Either max_distance or stimulus_range must be provided")
-  }
-  
+  validate_scalar(criterion, "criterion", lower = 0, upper = 1,
+                  lower_open = TRUE, upper_open = TRUE)
   if (!is.null(stimulus_range)) {
-    if (length(stimulus_range) != 2) {
-      stop("stimulus_range must be a vector of length 2")
-    }
-    max_distance <- abs(stimulus_range[2] - stimulus_range[1])
+    validate_rating_scale(stimulus_range)
+    max_distance <- diff(stimulus_range)
   }
-  
-  if (max_distance <= 0) {
-    stop("max_distance must be positive")
-  }
-  
-  if (criterion <= 0 || criterion >= 1) {
-    stop("criterion must be between 0 and 1 (exclusive)")
-  }
-  
-  # Calculate lambda threshold
-  lambda <- -log(criterion) / max_distance
-  
-  return(lambda)
+  if (is.null(max_distance)) stop("Either max_distance or stimulus_range must be provided")
+  validate_scalar(max_distance, "max_distance", lower = 0, lower_open = TRUE)
+  -log(criterion) / max_distance
 }
 
 #' Predict Group Membership
@@ -203,7 +208,8 @@ calculate_lambda_threshold <- function(max_distance = NULL, criterion = 0.7, sti
 #' Predicts group membership for participants based on model fit
 #' 
 #' @param object An mfeargen object from fit_mfeargen
-#' @param threshold Numeric. Probability threshold for group assignment (default: 0.5)
+#' @param threshold Numeric. Minimum posterior probability for assignment.
+#'   Participants below this threshold receive NA group labels (default: 0.5).
 #' @param ... Additional arguments (ignored)
 #' 
 #' @return Data frame with participant IDs and predicted group assignments
@@ -219,60 +225,25 @@ calculate_lambda_threshold <- function(max_distance = NULL, criterion = 0.7, sti
 #' 
 #' @export
 predict_groups <- function(object, threshold = 0.5, ...) {
-  # Validate input
-  if (!inherits(object, "mfeargen")) {
-    stop("object must be of class 'mfeargen'")
+  if (!inherits(object, "mfeargen")) stop("object must be of class 'mfeargen'")
+  validate_scalar(threshold, "threshold", lower = 0, upper = 1)
+  membership <- object$group_membership
+  if (is.null(membership)) {
+    membership <- extract_group_membership(object$jags_fit)
+    ids <- attr(object$jags_data, "participants")
+    if (!is.null(ids)) membership$participant <- ids
   }
-  
-  # Extract group probabilities from JAGS output
-  if ("z" %in% names(object$jags_fit$sims.list)) {
-    # Get posterior mode of group assignments
-    z_samples <- object$jags_fit$sims.list$z
-    
-    # Calculate mode for each participant
-    n_participants <- ncol(z_samples)
-    group_assignments <- numeric(n_participants)
-    
-    for (i in 1:n_participants) {
-      # Get frequency of each group assignment
-      group_freq <- table(z_samples[, i])
-      # Assign to most frequent group
-      group_assignments[i] <- as.numeric(names(group_freq)[which.max(group_freq)])
-    }
-  } else if ("N_group" %in% rownames(object$jags_fit$summary)) {
-    # Extract group counts
-    group_counts <- object$jags_fit$summary[grepl("^N_group\\[", rownames(object$jags_fit$summary)), "mean"]
-    
-    # For now, return summary of group proportions
-    n_participants <- object$jags_data$Nparticipants
-    group_assignments <- rep(1:4, times = round(group_counts))
-    
-    # Ensure correct length
-    if (length(group_assignments) < n_participants) {
-      group_assignments <- c(group_assignments, rep(1, n_participants - length(group_assignments)))
-    } else if (length(group_assignments) > n_participants) {
-      group_assignments <- group_assignments[1:n_participants]
-    }
-  } else {
-    # Fallback: use existing group_membership if available
-    if (!is.null(object$group_membership)) {
-      return(object$group_membership)
-    }
-    
-    # Otherwise, create placeholder
-    n_participants <- object$jags_data$Nparticipants
-    group_assignments <- sample(1:4, n_participants, replace = TRUE)
+  probability_columns <- paste0("prob_group_", 1:4)
+  if (!all(probability_columns %in% names(membership))) {
+    stop("Posterior group probabilities are unavailable; refit the model")
   }
-  
-  # Create output data frame
-  group_labels <- c("Non-Learner", "Overgeneralizer", "Physical", "Perceptual")
-  
-  result <- data.frame(
-    participant = 1:length(group_assignments),
-    group = group_assignments,
-    group_label = group_labels[group_assignments],
-    stringsAsFactors = FALSE
-  )
-  
-  return(result)
+  probabilities <- as.matrix(membership[probability_columns])
+  assignments <- max.col(probabilities, ties.method = "first")
+  max_probability <- apply(probabilities, 1, max)
+  labels <- c("Non-Learner", "Overgeneralizer", "Physical", "Perceptual")
+  membership$group <- ifelse(max_probability >= threshold, assignments, NA_integer_)
+  membership$group_label <- labels[membership$group]
+  membership$assigned_group <- membership$group_label
+  membership$max_probability <- max_probability
+  membership
 }

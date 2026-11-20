@@ -11,7 +11,9 @@ run_parameter_recovery(
   n.burnin = 5000,
   n.chains = 3,
   seed = NULL,
-  verbose = TRUE
+  verbose = TRUE,
+  simulation_args = list(),
+  ...
 )
 }
 \arguments{
@@ -28,6 +30,10 @@ run_parameter_recovery(
 \item{seed}{Integer. Random seed}
 
 \item{verbose}{Logical. Print progress messages}
+
+\item{simulation_args}{Named list of additional arguments to simulate_mfeargen.}
+
+\item{...}{Additional arguments to fit_mfeargen, such as parallel = FALSE.}
 }
 \value{
 mfeargen_recovery object containing recovery results

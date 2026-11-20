@@ -2,15 +2,18 @@
 % Please edit documentation in R/model_comparison.R
 \name{print.mfeargen_comparison}
 \alias{print.mfeargen_comparison}
-\title{Print Method for Model Comparison}
+\title{Print model comparisons}
 \usage{
 \method{print}{mfeargen_comparison}(x, ...)
 }
 \arguments{
-\item{x}{A mfeargen_comparison object}
+\item{x}{A mfeargen_comparison object.}
 
-\item{...}{Additional arguments}
+\item{...}{Arguments passed to print.data.frame.}
+}
+\value{
+The input, invisibly.
 }
 \description{
-Print Method for Model Comparison
+Print model comparisons
 }

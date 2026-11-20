@@ -7,7 +7,7 @@
 get_weak_priors(model_type = "1cs")
 }
 \arguments{
-\item{model_type}{Character. "1cs" or "2cs" (affects group probability priors)}
+\item{model_type}{Character. "1cs" or "2cs". Both use the same template.}
 }
 \value{
 A mfeargen_priors object

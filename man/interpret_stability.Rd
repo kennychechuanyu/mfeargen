@@ -2,11 +2,11 @@
 % Please edit documentation in R/08_hierarchical_model.R
 \name{interpret_stability}
 \alias{interpret_stability}
-\title{Interpret Stability Results}
+\title{Interpret Variance Ratios}
 \usage{
 interpret_stability(stability_list)
 }
 \description{
-Interpret Stability Results
+Interpret Variance Ratios
 }
 \keyword{internal}

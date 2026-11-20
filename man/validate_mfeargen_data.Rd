@@ -14,7 +14,7 @@ validate_mfeargen_data(data, model_type = NULL, verbose = TRUE)
 \item{verbose}{Logical. Print validation messages (default: TRUE)}
 }
 \value{
-Logical. TRUE if valid, FALSE otherwise
+TRUE if valid; invalid input raises an error.
 }
 \description{
 Validates that a data frame has the required structure for mfeargen analysis.

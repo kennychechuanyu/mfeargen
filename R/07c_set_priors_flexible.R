@@ -14,8 +14,8 @@ NULL
 #' @param lambda_sigma Prior for lambda_sigma (from prior_uniform)
 #' @param alpha_mu Prior for alpha_mu (from prior_beta)
 #' @param alpha_kappa Prior for alpha_kappa (from prior_uniform)
-#' @param sigma1 Prior for sigma[1] (from prior_uniform)
-#' @param sigma2 Prior for sigma[2] (from prior_uniform)
+#' @param sigma1 Prior for `sigma[1]` (from prior_uniform)
+#' @param sigma2 Prior for `sigma[2]` (from prior_uniform)
 #' @param pi Prior for group probabilities (from prior_dirichlet)
 #' @param w0_mu Prior for w0_mu (from prior_normal)
 #' @param w0_sigma Prior for w0_sigma (from prior_gamma)
@@ -197,6 +197,7 @@ set_priors_flexible <- function(
   attr(priors, "overrides") <- unique(override_names)
 
   class(priors) <- c("mfeargen_priors", "list")
+  validate_priors(priors)
   return(priors)
 }
 
@@ -278,7 +279,11 @@ combine_priors <- function(...) {
     }
   }
   
+  combined$alpha <- combined$alpha_mu
+  combined$lambda <- combined$lambda_mu
+  combined$sigma <- combined$sigma1
   attr(combined, "overrides") <- combined_overrides
   class(combined) <- c("mfeargen_priors", "list")
+  validate_priors(combined)
   return(combined)
 }

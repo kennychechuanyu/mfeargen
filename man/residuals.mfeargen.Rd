@@ -2,20 +2,21 @@
 % Please edit documentation in R/methods.R
 \name{residuals.mfeargen}
 \alias{residuals.mfeargen}
-\title{Residuals Method for mfeargen Objects}
+\title{Model residuals}
 \usage{
-\method{residuals}{mfeargen}(object, type = "raw", ...)
+\method{residuals}{mfeargen}(object, type = c("raw", "standardized"), ...)
 }
 \arguments{
-\item{object}{A mfeargen object}
+\item{object}{A fitted mfeargen model.}
 
-\item{type}{Character. Type of residuals ("raw", "standardized")}
+\item{type}{"raw" on the original rating scale, or "standardized" by the
+participant's posterior mean observation standard deviation.}
 
-\item{...}{Additional arguments (ignored)}
+\item{...}{Additional arguments (ignored).}
 }
 \value{
-Matrix of residuals
+A participant by trial matrix, with NA for missing observations.
 }
 \description{
-Residuals Method for mfeargen Objects
+Model residuals
 }

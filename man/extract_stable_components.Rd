@@ -2,19 +2,19 @@
 % Please edit documentation in R/08_hierarchical_model.R
 \name{extract_stable_components}
 \alias{extract_stable_components}
-\title{Extract Individual Stable Components}
+\title{Extract Stable Participant Parameters}
 \usage{
 extract_stable_components(fit, parameter = "alpha")
 }
 \arguments{
-\item{fit}{mfeargen_hierarchical object}
+\item{fit}{An \code{mfeargen_hierarchical} object.}
 
-\item{parameter}{Character. Parameter to extract}
+\item{parameter}{Parameter to extract.}
 }
 \value{
-Matrix of individual stable values (participants x MCMC samples)
+A matrix with participants in rows and posterior draws in columns.
+Row names retain participant IDs.
 }
 \description{
-Extracts the stable (characteristic) parameter values for each individual,
-representing their average tendency across sessions.
+Extract Stable Participant Parameters
 }

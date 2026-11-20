@@ -4,10 +4,12 @@
 \alias{extract_group_membership}
 \title{Extract Group Membership}
 \usage{
-extract_group_membership(fit)
+extract_group_membership(fit, participants = NULL)
 }
 \arguments{
 \item{fit}{JAGS output object}
+
+\item{participants}{Original participant identifiers.}
 }
 \value{
 Data frame with group assignments and probabilities

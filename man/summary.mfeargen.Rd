@@ -2,18 +2,18 @@
 % Please edit documentation in R/methods.R
 \name{summary.mfeargen}
 \alias{summary.mfeargen}
-\title{Summary Method for mfeargen Objects}
+\title{Summarize a fitted model}
 \usage{
 \method{summary}{mfeargen}(object, ...)
 }
 \arguments{
-\item{object}{A mfeargen object}
+\item{object}{A fitted mfeargen model.}
 
-\item{...}{Additional arguments (ignored)}
+\item{...}{Additional arguments (ignored).}
 }
 \value{
-A summary object
+Parameter summaries, group probabilities, and convergence diagnostics.
 }
 \description{
-Summary Method for mfeargen Objects
+Summarize a fitted model
 }

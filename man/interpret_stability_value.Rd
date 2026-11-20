@@ -2,11 +2,11 @@
 % Please edit documentation in R/08_hierarchical_model.R
 \name{interpret_stability_value}
 \alias{interpret_stability_value}
-\title{Interpret Stability Values}
+\title{Interpret a Variance Ratio}
 \usage{
 interpret_stability_value(stability)
 }
 \description{
-Interpret Stability Values
+Interpret a Variance Ratio
 }
 \keyword{internal}

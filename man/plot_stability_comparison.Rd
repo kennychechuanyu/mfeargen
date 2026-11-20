@@ -2,17 +2,16 @@
 % Please edit documentation in R/08_hierarchical_model.R
 \name{plot_stability_comparison}
 \alias{plot_stability_comparison}
-\title{Plot Stability Comparison}
+\title{Plot Variance Ratio Comparisons}
 \usage{
 plot_stability_comparison(stability_comparison)
 }
 \arguments{
-\item{stability_comparison}{Output from compare_parameter_stability()}
+\item{stability_comparison}{Output from \code{\link[=compare_parameter_stability]{compare_parameter_stability()}}.}
 }
 \value{
-ggplot object
+A ggplot object.
 }
 \description{
-Creates a forest plot comparing stability metrics across parameters
-with credible intervals.
+Plot Variance Ratio Comparisons
 }

@@ -2,15 +2,15 @@
 % Please edit documentation in R/08_hierarchical_model.R
 \name{print.mfeargen_stability}
 \alias{print.mfeargen_stability}
-\title{S3 Print Method for Stability Results}
+\title{Print a Variance Ratio Summary}
 \usage{
 \method{print}{mfeargen_stability}(x, ...)
 }
 \arguments{
-\item{x}{A mfeargen_stability object}
+\item{x}{An \code{mfeargen_stability} object.}
 
-\item{...}{Additional arguments (not used)}
+\item{...}{Unused.}
 }
 \description{
-S3 Print Method for Stability Results
+Print a Variance Ratio Summary
 }

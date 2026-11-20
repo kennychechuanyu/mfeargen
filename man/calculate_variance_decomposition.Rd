@@ -2,7 +2,7 @@
 % Please edit documentation in R/08_hierarchical_model.R
 \name{calculate_variance_decomposition}
 \alias{calculate_variance_decomposition}
-\title{Calculate Variance Decomposition}
+\title{Summarize Between-Person and Session Variance}
 \usage{
 calculate_variance_decomposition(
   fit,
@@ -10,24 +10,16 @@ calculate_variance_decomposition(
 )
 }
 \arguments{
-\item{fit}{mfeargen_hierarchical object from fit_mfeargen_hierarchical()}
+\item{fit}{An \code{mfeargen_hierarchical} object.}
 
-\item{parameters}{Character vector of parameters to decompose}
+\item{parameters}{Parameters to summarize.}
 }
 \value{
-List containing variance components and stability metrics
+An \code{mfeargen_variance_decomposition} list containing posterior means
+of between-person, within-person, and total variance, and posterior means
+of their draw-wise variance ratios. See \link{hierarchical_structure} for scale
+and interpretation.
 }
 \description{
-Decomposes total variance into between-person (stable) and within-person
-(session-specific) components for all model parameters.
-}
-\examples{
-\dontrun{
-# Fit hierarchical model
-fit <- fit_mfeargen_hierarchical(data)
-
-# Calculate variance decomposition
-var_decomp <- calculate_variance_decomposition(fit)
-print(var_decomp$stability)
-}
+Summarize Between-Person and Session Variance
 }

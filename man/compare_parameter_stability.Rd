@@ -2,19 +2,19 @@
 % Please edit documentation in R/08_hierarchical_model.R
 \name{compare_parameter_stability}
 \alias{compare_parameter_stability}
-\title{Compare Stability Across Parameters}
+\title{Compare Variance Ratios Across Parameters}
 \usage{
 compare_parameter_stability(fit, parameters = c("alpha", "lambda", "w0", "w1"))
 }
 \arguments{
-\item{fit}{mfeargen_hierarchical object}
+\item{fit}{An \code{mfeargen_hierarchical} object.}
 
-\item{parameters}{Character vector of parameters to compare}
+\item{parameters}{Parameters to compare.}
 }
 \value{
-Data frame with stability comparisons
+A data frame with posterior means, 95\% intervals, variance components,
+and descriptive labels.
 }
 \description{
-Compares stability metrics across multiple parameters to identify
-which aspects of behavior are more trait-like vs state-like.
+Compare Variance Ratios Across Parameters
 }

@@ -2,19 +2,20 @@
 % Please edit documentation in R/08_hierarchical_model.R
 \name{extract_session_deviations}
 \alias{extract_session_deviations}
-\title{Extract Session Deviations}
+\title{Extract Session Deviations from Stable Parameters}
 \usage{
 extract_session_deviations(fit, parameter = "alpha")
 }
 \arguments{
-\item{fit}{mfeargen_hierarchical object}
+\item{fit}{An \code{mfeargen_hierarchical} object.}
 
-\item{parameter}{Character. Parameter to analyze}
+\item{parameter}{Parameter to extract.}
 }
 \value{
-Array of deviations (participants x sessions x MCMC samples)
+An array with dimensions participant, session, posterior draw.
+Missing participant-session combinations contain \code{NA}. The \code{sessions}
+attribute records each participant's original session IDs.
 }
 \description{
-Extracts session-specific deviations from individual stable values,
-quantifying within-person variation across sessions.
+Extract Session Deviations from Stable Parameters
 }

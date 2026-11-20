@@ -2,18 +2,18 @@
 % Please edit documentation in R/methods.R
 \name{print.summary.mfeargen}
 \alias{print.summary.mfeargen}
-\title{Print Method for mfeargen Summary Objects}
+\title{Print model summaries}
 \usage{
 \method{print}{summary.mfeargen}(x, ...)
 }
 \arguments{
-\item{x}{A summary.mfeargen object}
+\item{x}{A summary.mfeargen object.}
 
-\item{...}{Additional arguments (ignored)}
+\item{...}{Additional arguments (ignored).}
 }
 \value{
-Invisibly returns the input object
+The input, invisibly.
 }
 \description{
-Print Method for mfeargen Summary Objects
+Print model summaries
 }

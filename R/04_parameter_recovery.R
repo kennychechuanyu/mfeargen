@@ -16,6 +16,8 @@ NULL
 #' @param n.chains Integer. Number of chains (default: 3)
 #' @param seed Integer. Random seed
 #' @param verbose Logical. Print progress messages
+#' @param simulation_args Named list of additional arguments to simulate_mfeargen.
+#' @param ... Additional arguments to fit_mfeargen, such as parallel = FALSE.
 #'
 #' @return mfeargen_recovery object containing recovery results
 #' @export
@@ -31,20 +33,27 @@ run_parameter_recovery <- function(
   n.burnin = 5000,
   n.chains = 3,
   seed = NULL,
-  verbose = TRUE
+  verbose = TRUE,
+  simulation_args = list(),
+  ...
 ) {
   
   if (verbose) message("Starting parameter recovery analysis...")
   
   # Generate simulated data
   if (verbose) message("1. Generating simulated data...")
-  sim_data <- simulate_mfeargen(
-    n_participants = n_participants,
-    model_type = model_type,
-    return_true_params = TRUE,
-    seed = seed
-  )
-  
+  if (!is.list(simulation_args) || (length(simulation_args) &&
+      (is.null(names(simulation_args)) || any(!nzchar(names(simulation_args)))))) {
+    stop("simulation_args must be a named list")
+  }
+  reserved <- c("n_participants", "model_type", "return_true_params", "seed")
+  if (any(names(simulation_args) %in% reserved)) {
+    stop("Set n_participants, model_type and seed directly, not in simulation_args")
+  }
+  sim_data <- do.call(simulate_mfeargen, c(list(
+    n_participants = n_participants, model_type = model_type,
+    return_true_params = TRUE, seed = seed), simulation_args))
+
   true_params <- attr(sim_data, "true_parameters")
   
   # Fit model
@@ -55,7 +64,9 @@ run_parameter_recovery <- function(
     n.iter = n.iter,
     n.burnin = n.burnin,
     n.chains = n.chains,
-    verbose = FALSE
+    verbose = FALSE,
+    seed = seed,
+    ...
   )
   
   # Extract recovered parameters
@@ -95,50 +106,51 @@ run_parameter_recovery <- function(
 #' Extract Recovered Parameters
 #' @keywords internal
 extract_recovered_parameters <- function(fit, true_params) {
-  n_participants <- nrow(true_params)
-  mcmc_output <- fit$jags_fit
-  
-  recovered <- data.frame(
-    participant = 1:n_participants,
-    alpha_recovered = if("alpha" %in% names(mcmc_output$mean)) mcmc_output$mean$alpha else NA,
-    lambda_recovered = if("lambda" %in% names(mcmc_output$mean)) mcmc_output$mean$lambda else NA,
-    w0_recovered = if("w0" %in% names(mcmc_output$mean)) mcmc_output$mean$w0 else NA,
-    w1_recovered = if("w1" %in% names(mcmc_output$mean)) mcmc_output$mean$w1 else NA,
-    group_recovered = if("gp" %in% names(mcmc_output$mean)) round(mcmc_output$mean$gp) else NA
-  )
-  
-  return(recovered)
+  estimates <- fit$jags_fit$mean
+  ids <- attr(fit$jags_data, "participants")
+  if (is.null(ids)) ids <- true_params$participant
+  recovered <- data.frame(participant = ids)
+  for (parameter in c("alpha", "lambda", "w0", "w1")) {
+    values <- estimates[[parameter]]
+    if (is.null(values)) stop("Missing posterior parameter: ", parameter)
+    recovered[[paste0(parameter, "_recovered")]] <- as.vector(values)
+  }
+  membership <- predict_groups(fit, threshold = 0)
+  recovered$group_recovered <- membership$group[match(ids, membership$participant)]
+  recovered[match(true_params$participant, recovered$participant), , drop = FALSE]
 }
 
 #' Calculate Recovery Metrics
 #' @keywords internal
 calculate_recovery_metrics <- function(true_params, recovered_params) {
-  combined <- cbind(true_params, recovered_params)
+  index <- match(true_params$participant, recovered_params$participant)
+  if (anyNA(index)) stop("Recovered participant IDs do not match simulated IDs")
+  recovered <- recovered_params[index, , drop = FALSE]
+  combined <- cbind(true_params, recovered[setdiff(names(recovered), "participant")])
   metrics <- list()
-  
-  # Alpha correlation
-  valid <- !is.na(combined$alpha_recovered) & combined$alpha_true > 0
-  if (sum(valid) > 2) {
-    metrics$alpha_correlation <- cor(combined$alpha_true[valid], combined$alpha_recovered[valid])
-    metrics$alpha_rmse <- sqrt(mean((combined$alpha_true[valid] - combined$alpha_recovered[valid])^2))
+  for (parameter in c("alpha", "lambda", "w0", "w1")) {
+    truth <- combined[[paste0(parameter, "_true")]]
+    estimate <- combined[[paste0(parameter, "_recovered")]]
+    valid <- is.finite(truth) & is.finite(estimate)
+    if (parameter == "alpha") valid <- valid & combined$group != 1L
+    if (parameter == "lambda") valid <- valid & combined$group > 2L
+    metrics[[paste0(parameter, "_correlation")]] <- if (sum(valid) > 2L &&
+        stats::sd(truth[valid]) > 0 && stats::sd(estimate[valid]) > 0) {
+      stats::cor(truth[valid], estimate[valid])
+    } else NA_real_
+    metrics[[paste0(parameter, "_rmse")]] <- if (any(valid)) {
+      sqrt(mean((truth[valid] - estimate[valid])^2))
+    } else NA_real_
   }
-  
-  # Lambda correlation
-  valid <- !is.na(combined$lambda_recovered) & combined$lambda_true > 0
-  if (sum(valid) > 2) {
-    metrics$lambda_correlation <- cor(combined$lambda_true[valid], combined$lambda_recovered[valid])
-    metrics$lambda_rmse <- sqrt(mean((combined$lambda_true[valid] - combined$lambda_recovered[valid])^2))
-  }
-  
-  # Group accuracy
-  if (!is.na(combined$group_recovered[1])) {
-    confusion_matrix <- table(True = combined$group, Recovered = combined$group_recovered)
-    metrics$group_accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
-    metrics$confusion_matrix <- confusion_matrix
-  }
-  
+  valid <- !is.na(combined$group_recovered)
+  metrics$group_accuracy <- if (any(valid)) {
+    mean(combined$group[valid] == combined$group_recovered[valid])
+  } else NA_real_
+  metrics$confusion_matrix <- table(
+    True = factor(combined$group, levels = 1:4),
+    Recovered = factor(combined$group_recovered, levels = 1:4))
   metrics$combined_data <- combined
-  return(metrics)
+  metrics
 }
 
 #' Print Recovery Summary

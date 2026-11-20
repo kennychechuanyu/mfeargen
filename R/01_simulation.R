@@ -15,7 +15,8 @@ NULL
 #' @param stimuli Numeric vector. All stimulus values (default: 1:10)
 #' @param cs_plus Numeric. CS+ stimulus value (default: 5)
 #' @param cs_minus Numeric. CS- stimulus value for 2cs (default: 3)
-#' @param n_conditioning_trials Integer. CS+ trials in conditioning (default: 24)
+#' @param n_conditioning_trials Integer. Total conditioning trials (default: 24).
+#'   For 2cs, trials alternate between CS+ and CS-.
 #' @param n_generalization_trials Integer. Trials per stimulus in test (default: 16)
 #' @param reinforcement_rate Numeric. CS+ reinforcement rate (default: 0.75)
 #' @param model_type Character. "1cs" or "2cs" (default: "1cs")
@@ -26,7 +27,13 @@ NULL
 #' @param seed Integer. Random seed for reproducibility
 #' @param return_true_params Logical. Return true parameters (default: FALSE)
 #'
-#' @return Data frame with simulated data
+#' @details Observation noise is shared by learners and separately by
+#'   non-learners, matching the fitted model. Ratings are clipped to the
+#'   requested scale to represent bounded measurements. The fitting likelihood
+#'   uses an uncensored normal approximation, so recovery can be biased when
+#'   many responses fall at the scale endpoints.
+#' @return Data frame with simulated data. The true_parameters attribute, when
+#'   requested, records observation standard deviations in the original units.
 #' @export
 #' @examples
 #' # Basic simulation with default stimuli (1:10), CS+ at 5
@@ -68,43 +75,60 @@ simulate_mfeargen <- function(
 
   model_type <- match.arg(model_type)
 
-  # Validate inputs
-  if (n_participants <= 0) stop("n_participants must be positive")
-  if (n_conditioning_trials <= 0) stop("n_conditioning_trials must be positive")
-  if (n_generalization_trials < 0) stop("n_generalization_trials must be non-negative")
-  if (abs(sum(group_proportions) - 1) > 1e-10) stop("group_proportions must sum to 1")
-
-  # Validate CS+ is in stimuli
-  if (!cs_plus %in% stimuli) {
-    stop("cs_plus (", cs_plus, ") must be one of the stimuli: ", paste(stimuli, collapse = ", "))
+  validate_scalar(n_participants, "n_participants", lower = 1, integer = TRUE)
+  validate_scalar(n_conditioning_trials, "n_conditioning_trials", lower = 1, integer = TRUE)
+  validate_scalar(n_generalization_trials, "n_generalization_trials", lower = 0, integer = TRUE)
+  validate_scalar(reinforcement_rate, "reinforcement_rate", lower = 0, upper = 1)
+  validate_scalar(perceptual_noise_sd, "perceptual_noise_sd", lower = 0)
+  validate_rating_scale(rating_scale)
+  if (!is.logical(return_true_params) || length(return_true_params) != 1L || is.na(return_true_params)) {
+    stop("return_true_params must be TRUE or FALSE")
+  }
+  if (!is.numeric(stimuli) || length(stimuli) < 2L || any(!is.finite(stimuli)) ||
+      anyDuplicated(stimuli)) stop("stimuli must contain at least two distinct finite values")
+  if (!is.numeric(group_proportions) || length(group_proportions) != 4L ||
+      anyNA(group_proportions) || any(!is.finite(group_proportions) | group_proportions < 0) ||
+      abs(sum(group_proportions) - 1) > 1e-10) {
+    stop("group_proportions must contain four non-negative probabilities summing to 1")
+  }
+  validate_scalar(cs_plus, "cs_plus")
+  if (!cs_plus %in% stimuli) stop("cs_plus must be one of stimuli")
+  if (model_type == "2cs") {
+    validate_scalar(cs_minus, "cs_minus")
+    if (!cs_minus %in% stimuli || cs_minus == cs_plus) stop("cs_minus must be a distinct value in stimuli")
+    if (n_conditioning_trials < 2) stop("2cs requires at least two conditioning trials")
+  }
+  if (!is.null(seed)) {
+    validate_scalar(seed, "seed", lower = 0, upper = .Machine$integer.max, integer = TRUE)
+    had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    if (had_seed) previous_seed <- get(".Random.seed", envir = .GlobalEnv)
+    on.exit({
+      if (had_seed) assign(".Random.seed", previous_seed, envir = .GlobalEnv)
+      else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) rm(".Random.seed", envir = .GlobalEnv)
+    }, add = TRUE)
+    set.seed(seed)
   }
 
-  # Validate CS- for 2cs
-  if (model_type == "2cs" && !cs_minus %in% stimuli) {
-    stop("cs_minus (", cs_minus, ") must be one of the stimuli: ", paste(stimuli, collapse = ", "))
-  }
-
-  # Set seed if provided
-  if (!is.null(seed)) set.seed(seed)
-
-  # Calculate lambda threshold based on stimulus range
-  stimulus_range <- range(stimuli)
-  max_distance <- diff(stimulus_range)
-  lambda_threshold <- -log(lambda_criterion) / max_distance
+  max_distance <- max(abs(stimuli - cs_plus))
+  if (model_type == "2cs") max_distance <- max(max_distance, abs(stimuli - cs_minus))
+  lambda_threshold <- calculate_lambda_threshold(max_distance, lambda_criterion)
 
   # Initialize storage
   all_data <- list()
   true_params <- list()
   participant_params <- list()
+  observation_sigma <- c(runif(1, 0.5, 1.5), runif(1, 2, 3)) * diff(rating_scale) / 10
 
   # Generate data for each participant
-  for (p in 1:n_participants) {
+  for (p in seq_len(n_participants)) {
 
     # Assign to latent group
     group <- sample(1:4, 1, prob = group_proportions)
 
     # Generate group-specific parameters
-    params <- generate_group_parameters(group, lambda_threshold, perceptual_noise_sd)
+    params <- generate_group_parameters(
+      group, lambda_threshold, sigma = observation_sigma[if (group == 1) 2L else 1L]
+    )
 
     # Store parameters
     participant_params[[p]] <- list(
@@ -166,6 +190,7 @@ simulate_mfeargen <- function(
   } else NULL
 
   # Add metadata
+  attr(final_data, "rating_scale") <- rating_scale
   attr(final_data, "simulation_info") <- list(
     model_type = model_type,
     n_participants = n_participants,
@@ -179,6 +204,8 @@ simulate_mfeargen <- function(
     reinforcement_rate = reinforcement_rate,
     group_proportions = group_proportions,
     lambda_threshold = lambda_threshold,
+    rating_scale = rating_scale,
+    observation_sigma = observation_sigma,
     seed = seed
   )
 
@@ -211,10 +238,10 @@ simulate_participant <- function(p, group, params, stimuli, cs_plus, cs_minus,
   V_cs_minus <- 0
   overall_trial <- 0
 
-  # ========== PHASE 1: CONDITIONING ==========
+  # Conditioning responses precede the reinforcement outcome.
   conditioning_list <- vector("list", n_conditioning_trials)
 
-  for (trial in 1:n_conditioning_trials) {
+  for (trial in seq_len(n_conditioning_trials)) {
     overall_trial <- overall_trial + 1
 
     # Determine stimulus and reinforcement
@@ -233,7 +260,7 @@ simulate_participant <- function(p, group, params, stimuli, cs_plus, cs_minus,
       } else {
         stimulus <- cs_minus
         stimulus_type <- "CS-"
-        US_presented <- 0
+        US_presented <- -1
         g_value <- V_cs_minus
       }
     }
@@ -244,7 +271,14 @@ simulate_participant <- function(p, group, params, stimuli, cs_plus, cs_minus,
     Per_size <- pmax(stimulus_range[1], pmin(stimulus_range[2], Per_size))
     Phy_size <- stimulus
 
-    # Response generation
+    if (group != 1) {
+      distance_plus <- abs(if (group == 4) Per_size - cs_plus else Phy_size - cs_plus)
+      g_value <- V_cs_plus * exp(-lambda * distance_plus)
+      if (model_type == "2cs") {
+        distance_minus <- abs(if (group == 4) Per_size - cs_minus else Phy_size - cs_minus)
+        g_value <- g_value + V_cs_minus * exp(-lambda * distance_minus)
+      }
+    }
     theta <- generate_response(g_value, w0, w1, rating_scale)
     US_expect <- rnorm(1, theta, sigma)
     US_expect <- pmax(rating_scale[1], pmin(rating_scale[2], US_expect))
@@ -287,13 +321,13 @@ simulate_participant <- function(p, group, params, stimuli, cs_plus, cs_minus,
   }
   conditioning_data <- do.call(rbind, conditioning_list)
 
-  # ========== PHASE 2: GENERALIZATION ==========
+  # Generalization trials do not update associative strength.
   generalization_list <- list()
 
   if (n_generalization_trials > 0) {
     # Create test sequence: repeat all stimuli n_generalization_trials times
     test_sequence <- rep(stimuli, each = n_generalization_trials)
-    test_sequence <- sample(test_sequence)  # Randomize order
+    test_sequence <- test_sequence[sample.int(length(test_sequence))]
 
     for (trial in seq_along(test_sequence)) {
       overall_trial <- overall_trial + 1
@@ -389,52 +423,21 @@ simulate_participant <- function(p, group, params, stimuli, cs_plus, cs_minus,
 #'
 #' @param group Integer (1-4) indicating latent group
 #' @param lambda_threshold Numeric. Threshold for lambda values
-#' @param perceptual_noise_sd Numeric. SD for perceptual noise
+#' @param sigma Numeric. Shared observation standard deviation.
 #' @return List with parameters
 #' @keywords internal
-generate_group_parameters <- function(group, lambda_threshold, perceptual_noise_sd = 0.5) {
-
+generate_group_parameters <- function(group, lambda_threshold, sigma) {
   if (group == 1) {
-    # Non-learners: No learning or generalization
-    list(
-      alpha = 0,
-      lambda = 0,
-      w0 = rnorm(1, 0, 2),
-      w1 = 0,
-      sigma = runif(1, 2, 3)
-    )
-  } else if (group == 2) {
-    # Overgeneralizers: Good learning, broad generalization
-    list(
-      alpha = rbeta(1, 3, 2),
-      lambda = runif(1, 0, lambda_threshold * 0.5),
-      w0 = rnorm(1, -1, 0.5),
-      w1 = rgamma(1, 3, 1) + 1,
-      sigma = runif(1, 0.5, 1.5)
-    )
-  } else if (group == 3) {
-    # Physical generalizers: Sharp generalization based on physical distance
-    lambda_val <- rnorm(1, lambda_threshold * 2, lambda_threshold * 0.3)
-    list(
-      alpha = rbeta(1, 3, 2),
-      lambda = pmax(lambda_threshold, lambda_val),
-      w0 = rnorm(1, -1, 0.5),
-      w1 = rgamma(1, 3, 1) + 1,
-      sigma = runif(1, 0.4, 1.2)
-    )
-  } else {
-    # Perceptual generalizers: Sharp generalization based on perceptual distance
-    lambda_val <- rnorm(1, lambda_threshold * 2, lambda_threshold * 0.3)
-    list(
-      alpha = rbeta(1, 3, 2),
-      lambda = pmax(lambda_threshold, lambda_val),
-      w0 = rnorm(1, -1, 0.5),
-      w1 = rgamma(1, 3, 1) + 1,
-      sigma = runif(1, 0.4, 1.2)
-    )
+    return(list(alpha = 0, lambda = 0, w0 = rnorm(1, 0, 2), w1 = 0, sigma = sigma))
   }
+  lambda <- if (group == 2) {
+    runif(1, 0, lambda_threshold * 0.5)
+  } else {
+    max(lambda_threshold, rnorm(1, lambda_threshold * 2, lambda_threshold * 0.3))
+  }
+  list(alpha = rbeta(1, 3, 2), lambda = lambda, w0 = rnorm(1, -1, 0.5),
+       w1 = rgamma(1, 3, 1) + 1, sigma = sigma)
 }
-
 
 #' Generate Response Using Sigmoid Transformation
 #'
@@ -447,6 +450,6 @@ generate_group_parameters <- function(group, lambda_threshold, perceptual_noise_
 generate_response <- function(g_value, w0, w1, rating_scale) {
   A <- rating_scale[1]
   K <- rating_scale[2]
-  theta <- A + (K - A) / (1 + exp(-(w0 + w1 * g_value)))
+  theta <- A + (K - A) * stats::plogis(w0 + w1 * g_value)
   return(theta)
 }
