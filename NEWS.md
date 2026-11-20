@@ -7,6 +7,7 @@
 * Make rating bounds explicit and keep response summaries on the original scale.
 * Calculate group assignments from posterior group probabilities.
 * Replace placeholder summaries and plots with calculations from posterior draws.
+* Avoid dynamic variance indexing so long trial sequences compile promptly.
 * Add executable regression tests, JAGS integration checks, and package checks in CI.
 * Correct the installation instructions, examples, and supported-model documentation.
 

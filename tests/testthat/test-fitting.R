@@ -59,3 +59,24 @@ test_that("manually prepared data cannot bypass response scale normalization", {
   prepared$rating_scale <- c(0, 100)
   expect_error(fit_mfeargen(data, prepared_data = prepared), "normalized 0-10")
 })
+
+test_that("the full study trial graph compiles and uses group-specific observation noise", {
+  skip_if_no_jags()
+  data <- prepare_paper_trials("exp1")
+  prepared <- prepare_mfeargen_data(data, "1cs", rating_scale = c(1, 10))
+  model <- rjags::jags.model(
+    system.file("jags", "model_1cs.txt", package = "mfeargen"),
+    data = prepared, inits = initialize_mcmc_parameters(prepared, 1),
+    n.chains = 1, n.adapt = 0, quiet = TRUE
+  )
+  samples <- as.matrix(suppressWarnings(rjags::coda.samples(
+    model, variable.names = c("gp", "sigma", "tau_obs"),
+    n.iter = 2, progress.bar = "none"
+  ))[[1]])
+  expect_equal(prepared$Nparticipants, 40)
+  expect_gt(prepared$Ntrials, 150)
+  groups <- samples[, paste0("gp[", seq_len(prepared$Nparticipants), "]"), drop = FALSE]
+  precision <- samples[, paste0("tau_obs[", seq_len(prepared$Nparticipants), "]"), drop = FALSE]
+  expected <- 1 / ifelse(groups == 1, samples[, "sigma[2]"], samples[, "sigma[1]"])^2
+  expect_equal(unname(precision), unname(expected))
+})
