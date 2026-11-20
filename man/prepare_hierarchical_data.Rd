@@ -8,7 +8,8 @@ prepare_hierarchical_data(
   data,
   model_type = "1cs",
   lambda_criterion = 0.7,
-  rating_scale = NULL
+  rating_scale = NULL,
+  observation_model = NULL
 )
 }
 \description{

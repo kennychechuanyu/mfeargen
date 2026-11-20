@@ -38,3 +38,11 @@ test_that("combining priors retains template values and explicit overrides", {
   expect_equal(combined$sigma1, template$sigma1)
   expect_equal(combined$sigma, combined$sigma1)
 })
+
+
+test_that("ambiguous prior specifications and unusable precisions are rejected", {
+  expect_error(set_priors(alpha = prior_beta(1, 1), alpha = prior_beta(2, 2)), "distinct names")
+  expect_error(prior_dirichlet(alpha = rep(1, 4), concentration = rep(2, 4)), "not both")
+  expect_error(prior_normal(sd = 1e200), "precision")
+  expect_error(prior_lognormal(meanlog = 0, sdlog = 1e-200), "precision")
+})

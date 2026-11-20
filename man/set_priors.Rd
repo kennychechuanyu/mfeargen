@@ -30,7 +30,7 @@ set_priors(
 )
 }
 \arguments{
-\item{...}{Additional prior specifications (currently unused)}
+\item{...}{Named prior objects overriding the corresponding hyperpriors.}
 
 \item{lambda_mu_mean}{Mean for lambda_mu lognormal prior (default: 0)}
 

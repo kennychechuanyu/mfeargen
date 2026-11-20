@@ -32,7 +32,7 @@ NULL
 #' @param w1_a_rate Rate for w1_a scaled gamma prior (default: 1)
 #' @param w1_b_shape Shape for w1_b scaled gamma prior (default: 2)
 #' @param w1_b_rate Rate for w1_b scaled gamma prior (default: 1)
-#' @param ... Additional prior specifications (currently unused)
+#' @param ... Named prior objects overriding the corresponding hyperpriors.
 #'
 #' @return A list of prior specifications for use with fit_mfeargen
 #' @export
@@ -96,6 +96,7 @@ set_priors <- function(
   if (length(overrides) && (is.null(names(overrides)) || any(!nzchar(names(overrides))))) {
     stop("Prior overrides must be named")
   }
+  if (anyDuplicated(names(overrides))) stop("Prior overrides must have distinct names")
   supplied <- names(match.call(expand.dots = FALSE))
   mapping <- c(lambda_mu_mean = "lambda_mu", lambda_mu_sd = "lambda_mu",
                lambda_sigma_min = "lambda_sigma", lambda_sigma_max = "lambda_sigma",

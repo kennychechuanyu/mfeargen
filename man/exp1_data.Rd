@@ -15,7 +15,7 @@ A data frame with 7,520 rows and 17 variables:
 \item{startle_circle, startle_iti}{Startle probe indicators during stimulus
 presentation and the inter-trial interval.}
 \item{per_size}{Perceptual stimulus measurement.}
-\item{us_expect}{US expectancy rating on the original 0-10 scale.}
+\item{us_expect}{US expectancy rating on the original 1-10 scale.}
 \item{total_trial_nr}{Trial number across the experiment.}
 \item{stimulus, stimulus_phy}{Stimulus label and physical stimulus identifier.}
 \item{cs_trials}{CS+ trial indicator, 0 or 1.}

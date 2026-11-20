@@ -18,6 +18,8 @@ fit_mfeargen(
   verbose = TRUE,
   rating_scale = NULL,
   seed = NULL,
+  observation_model = NULL,
+  save_predictive = FALSE,
   ...
 )
 }
@@ -48,6 +50,14 @@ fit_mfeargen(
 If omitted, uses simulation metadata or the observed range.}
 
 \item{seed}{Integer. Optional seed for initialization and sampling.}
+
+\item{observation_model}{Either \code{"normal"} for an uncensored Gaussian response
+or \code{"censored"} for ratings clipped at their instrument bounds. If NULL,
+uses the data's observation-model metadata, otherwise \code{"normal"}.}
+
+\item{save_predictive}{Retain a full array of replicated ratings in the fit.
+Defaults to FALSE to reduce memory use; posterior_predict generates these
+ratings when needed.}
 
 \item{...}{Additional arguments passed to jagsUI}
 }

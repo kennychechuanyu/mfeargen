@@ -83,3 +83,37 @@ test_that("observation noise matches the fitted learner and non-learner categori
   expect_length(unique(truth$sigma_true[truth$group != 1]), 1L)
   expect_gt(truth$sigma_true[truth$group == 1][1], truth$sigma_true[truth$group != 1][1])
 })
+
+test_that("overgeneralizer responses use the same distances as the fitted model", {
+  for (design in c("1cs", "2cs")) {
+    set.seed(73)
+    data <- simulate_participant(
+      p = 1, group = 2,
+      params = list(alpha = 1, lambda = 0.3, w0 = -0.5, w1 = 2, sigma = 0),
+      stimuli = 1:3, cs_plus = 3, cs_minus = 1,
+      n_conditioning_trials = 4, n_generalization_trials = 2,
+      reinforcement_rate = 1, model_type = design, rating_scale = c(0, 10),
+      perceptual_noise_sd = 1
+    )
+    test <- data[data$phase == "generalization", ]
+    strength <- exp(-0.3 * abs(test$Per_size - 3))
+    if (design == "2cs") strength <- strength - exp(-0.3 * abs(test$Per_size - 1))
+    expect_equal(test$US_expect, 10 * plogis(-0.5 + 2 * strength))
+  }
+})
+
+test_that("censored and normal simulation differ only at the instrument bounds", {
+  args <- list(n_participants = 8, n_conditioning_trials = 8,
+               n_generalization_trials = 3, seed = 94,
+               group_proportions = c(1, 0, 0, 0))
+  normal <- do.call(simulate_mfeargen, c(args, list(observation_model = "normal")))
+  censored <- do.call(simulate_mfeargen, c(args, list(observation_model = "censored")))
+  expect_true(any(normal$US_expect < 1 | normal$US_expect > 10))
+  expect_equal(censored$US_expect, pmin(10, pmax(1, normal$US_expect)))
+  expect_equal(normal$Per_size, censored$Per_size)
+  expect_identical(attr(normal, "observation_model"), "normal")
+  expect_identical(attr(censored, "observation_model"), "censored")
+  expect_identical(attr(prepare_mfeargen_data(normal), "observation_model"), "normal")
+  expect_equal(as.vector(t(prepare_mfeargen_data(normal)$y)),
+               (normal$US_expect - 1) / 9 * 10)
+})

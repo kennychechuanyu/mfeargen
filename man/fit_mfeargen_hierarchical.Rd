@@ -17,6 +17,8 @@ fit_mfeargen_hierarchical(
   verbose = TRUE,
   rating_scale = NULL,
   seed = NULL,
+  observation_model = NULL,
+  save_predictive = FALSE,
   ...
 )
 }
@@ -47,6 +49,13 @@ supported; a non-NULL value produces an error.}
 \item{rating_scale}{Numeric vector containing the original rating bounds.}
 
 \item{seed}{Optional integer seed for reproducible initialization and sampling.}
+
+\item{observation_model}{\code{"normal"} for Gaussian ratings or \code{"censored"}
+for ratings clipped to instrument bounds. NULL uses simulation metadata
+when available and otherwise selects \code{"normal"}.}
+
+\item{save_predictive}{Store posterior predictive draws during fitting.
+FALSE saves memory; prediction draws can be generated from fitted parameters.}
 
 \item{...}{Additional arguments passed to \code{\link[jagsUI:jags]{jagsUI::jags()}}.}
 }

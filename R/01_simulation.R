@@ -26,12 +26,16 @@ NULL
 #' @param lambda_criterion Numeric. Criterion for lambda threshold (default: 0.7)
 #' @param seed Integer. Random seed for reproducibility
 #' @param return_true_params Logical. Return true parameters (default: FALSE)
+#' @param observation_model "censored" clips Gaussian observations to the
+#'   instrument bounds; "normal" leaves Gaussian draws unbounded. The chosen
+#'   model is stored as metadata for fit_mfeargen.
 #'
 #' @details Observation noise is shared by learners and separately by
-#'   non-learners, matching the fitted model. Ratings are clipped to the
-#'   requested scale to represent bounded measurements. The fitting likelihood
-#'   uses an uncensored normal approximation, so recovery can be biased when
-#'   many responses fall at the scale endpoints.
+#'   non-learners. Censored observations use the scale endpoints for latent
+#'   Gaussian draws outside the instrument range. Normal observations can fall
+#'   outside rating_scale, whose bounds specify the sigmoid's asymptotes.
+#'   Physical generalizers use physical distances; overgeneralizers and
+#'   perceptual generalizers use perceptual distances, matching the fitted model.
 #' @return Data frame with simulated data. The true_parameters attribute, when
 #'   requested, records observation standard deviations in the original units.
 #' @export
@@ -70,10 +74,12 @@ simulate_mfeargen <- function(
   perceptual_noise_sd = 0.5,
   lambda_criterion = 0.7,
   seed = NULL,
-  return_true_params = FALSE
+  return_true_params = FALSE,
+  observation_model = c("censored", "normal")
 ) {
 
   model_type <- match.arg(model_type)
+  observation_model <- match.arg(observation_model)
 
   validate_scalar(n_participants, "n_participants", lower = 1, integer = TRUE)
   validate_scalar(n_conditioning_trials, "n_conditioning_trials", lower = 1, integer = TRUE)
@@ -117,7 +123,7 @@ simulate_mfeargen <- function(
   all_data <- list()
   true_params <- list()
   participant_params <- list()
-  observation_sigma <- c(runif(1, 0.5, 1.5), runif(1, 2, 3)) * diff(rating_scale) / 10
+  observation_sigma <- c(runif(1, 0.5, 1.5), runif(1, 2, 3)) / 10 * diff(rating_scale)
 
   # Generate data for each participant
   for (p in seq_len(n_participants)) {
@@ -163,7 +169,8 @@ simulate_mfeargen <- function(
       reinforcement_rate = reinforcement_rate,
       model_type = model_type,
       rating_scale = rating_scale,
-      perceptual_noise_sd = perceptual_noise_sd
+      perceptual_noise_sd = perceptual_noise_sd,
+      observation_model = observation_model
     )
 
     all_data[[p]] <- participant_data
@@ -191,6 +198,7 @@ simulate_mfeargen <- function(
 
   # Add metadata
   attr(final_data, "rating_scale") <- rating_scale
+  attr(final_data, "observation_model") <- observation_model
   attr(final_data, "simulation_info") <- list(
     model_type = model_type,
     n_participants = n_participants,
@@ -206,6 +214,7 @@ simulate_mfeargen <- function(
     lambda_threshold = lambda_threshold,
     rating_scale = rating_scale,
     observation_sigma = observation_sigma,
+    observation_model = observation_model,
     seed = seed
   )
 
@@ -224,7 +233,7 @@ simulate_mfeargen <- function(
 simulate_participant <- function(p, group, params, stimuli, cs_plus, cs_minus,
                                  n_conditioning_trials, n_generalization_trials,
                                  reinforcement_rate, model_type, rating_scale,
-                                 perceptual_noise_sd) {
+                                 perceptual_noise_sd, observation_model = "censored") {
 
   # Extract parameters
   alpha <- params$alpha
@@ -272,16 +281,18 @@ simulate_participant <- function(p, group, params, stimuli, cs_plus, cs_minus,
     Phy_size <- stimulus
 
     if (group != 1) {
-      distance_plus <- abs(if (group == 4) Per_size - cs_plus else Phy_size - cs_plus)
+      distance_plus <- abs(if (group != 3) Per_size - cs_plus else Phy_size - cs_plus)
       g_value <- V_cs_plus * exp(-lambda * distance_plus)
       if (model_type == "2cs") {
-        distance_minus <- abs(if (group == 4) Per_size - cs_minus else Phy_size - cs_minus)
+        distance_minus <- abs(if (group != 3) Per_size - cs_minus else Phy_size - cs_minus)
         g_value <- g_value + V_cs_minus * exp(-lambda * distance_minus)
       }
     }
     theta <- generate_response(g_value, w0, w1, rating_scale)
     US_expect <- rnorm(1, theta, sigma)
-    US_expect <- pmax(rating_scale[1], pmin(rating_scale[2], US_expect))
+    if (observation_model == "censored") {
+      US_expect <- pmax(rating_scale[1], pmin(rating_scale[2], US_expect))
+    }
 
     # Store trial
     trial_data <- data.frame(
@@ -356,8 +367,8 @@ simulate_participant <- function(p, group, params, stimuli, cs_plus, cs_minus,
         g_value <- 0  # Non-learners
       } else {
         # Distance calculation based on group
-        if (group == 4) {
-          # Perceptual generalizers use perceived distance
+        if (group != 3) {
+          # Groups 2 and 4 use perceived distance
           distance_plus <- abs(Per_size - cs_plus)
         } else {
           # Physical generalizers use physical distance
@@ -369,7 +380,7 @@ simulate_participant <- function(p, group, params, stimuli, cs_plus, cs_minus,
 
         # Add CS- contribution for 2CS
         if (model_type == "2cs") {
-          if (group == 4) {
+          if (group != 3) {
             distance_minus <- abs(Per_size - cs_minus)
           } else {
             distance_minus <- abs(Phy_size - cs_minus)
@@ -382,7 +393,9 @@ simulate_participant <- function(p, group, params, stimuli, cs_plus, cs_minus,
       # Response generation
       theta <- generate_response(g_value, w0, w1, rating_scale)
       US_expect <- rnorm(1, theta, sigma)
-      US_expect <- pmax(rating_scale[1], pmin(rating_scale[2], US_expect))
+      if (observation_model == "censored") {
+        US_expect <- pmax(rating_scale[1], pmin(rating_scale[2], US_expect))
+      }
 
       # Store trial
       trial_data <- data.frame(

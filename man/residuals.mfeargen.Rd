@@ -10,7 +10,7 @@
 \item{object}{A fitted mfeargen model.}
 
 \item{type}{"raw" on the original rating scale, or "standardized" by the
-participant's posterior mean observation standard deviation.}
+posterior mean conditional observation standard deviation.}
 
 \item{...}{Additional arguments (ignored).}
 }

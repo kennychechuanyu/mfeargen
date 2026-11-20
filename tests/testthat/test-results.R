@@ -87,7 +87,7 @@ test_that("held-out ratings receive finite predictions without training leakage"
   data$participant <- factor(data$participant, levels = c(1, 2, 3))
   set.seed(15)
   state <- .Random.seed
-  cv <- cross_validate_mfeargen(data, k_folds = 2, seed = 22,
+  cv <- cross_validate_mfeargen(data, k_folds = 2, seed = 22, keep_fits = TRUE,
                                n.iter = 70, n.burnin = 30, n.thin = 1,
                                n.chains = 1, n.adapt = 100,
                                parallel = FALSE, verbose = FALSE)
@@ -124,4 +124,44 @@ test_that("group plots display posterior probabilities for each participant", {
   expect_equal(nrow(p$data), 8L)
   expect_equal(as.vector(tapply(p$data$probability, p$data$participant, sum)), c(1, 1))
   expect_s3_class(ggplot2::ggplot_build(p), "ggplot_built")
+})
+
+
+test_that("coefficient exports identify participants and express noise in rating units", {
+  fit <- result_fixture()
+  fit$jags_fit$summary <- rbind(fit$jags_fit$summary,
+                                "sigma[1]" = c(1, 0.1, 0.8, 1.2),
+                                "pi[3]" = c(0.2, 0.05, 0.1, 0.3))
+  result <- coef(fit)
+  expect_equal(result$participant[1], "a")
+  expect_equal(result$estimate[2], 10)
+  expect_equal(result$posterior_sd[2], 1)
+  expect_equal(result$component[2], "Learners")
+  expect_equal(result$component[3], "Physical Generalizers")
+  expect_equal(coef(fit, scale = "normalized")$estimate[2], 1)
+})
+
+test_that("comparisons reject mismatched observation measures", {
+  normal <- result_fixture()
+  censored <- normal
+  censored$observation_model <- "censored"
+  expect_error(compare_models(normal, censored), "observation_model")
+  expect_error(cross_validate_mfeargen(simulate_mfeargen(seed = 2), k_folds = 1e12), "integer")
+  expect_output(print(calculate_waic(normal)), "variance above 0.4")
+})
+
+
+test_that("cross-validation retains predictions without retaining every MCMC object", {
+  skip_if_no_jags()
+  data <- simulate_mfeargen(n_participants = 2, n_conditioning_trials = 4,
+                           n_generalization_trials = 1, seed = 27)
+  result <- cross_validate_mfeargen(data, k_folds = 2, seed = 31,
+                                   n.iter = 70, n.burnin = 30, n.thin = 1,
+                                   n.chains = 1, n.adapt = 100,
+                                   parallel = FALSE, verbose = FALSE)
+  expect_true(all(vapply(result$fold_results, function(x) is.null(x$fit), logical(1))))
+  expect_true(all(is.finite(result$fold_metrics$mse_test)))
+  squared_errors <- unlist(lapply(result$fold_results, function(x) (x$observations - x$predictions)^2))
+  expect_equal(result$summary$mean_mse, mean(squared_errors))
+  expect_output(print(result), "Folds passing sampling diagnostics")
 })

@@ -14,107 +14,10 @@ validate_scalar <- function(x, name, lower = -Inf, upper = Inf, integer = FALSE,
 
 validate_rating_scale <- function(scale) {
   if (!is.numeric(scale) || length(scale) != 2L || anyNA(scale) ||
-      any(!is.finite(scale)) || scale[1] >= scale[2]) {
+      any(!is.finite(scale)) || scale[1] >= scale[2] || !is.finite(diff(scale))) {
     stop("rating_scale must contain two finite, increasing bounds", call. = FALSE)
   }
   invisible(scale)
-}
-
-#' @noRd
-
-# Internal helper functions (not exported)
-#' @noRd
-calculate_physical_distance <- function(stimulus_values, cs_value) {
-  abs(stimulus_values - cs_value)
-}
-
-calculate_perceptual_distance <- function(perceived_values, perceived_cs_mean) {
-  abs(perceived_values - perceived_cs_mean)
-}
-
-calculate_similarity <- function(distances, lambda) {
-  exp(-lambda * distances)
-}
-
-# Internal helper function (not exported)
-format_mcmc_summary <- function(mcmc_summary) {
-  
-  if (is.null(mcmc_summary)) {
-    return(NULL)
-  }
-  
-  # Convert to data frame if necessary
-  if (is.matrix(mcmc_summary)) {
-    mcmc_summary <- as.data.frame(mcmc_summary)
-  }
-  
-  # Round numeric columns
-  numeric_cols <- sapply(mcmc_summary, is.numeric)
-  mcmc_summary[numeric_cols] <- lapply(mcmc_summary[numeric_cols], round, 4)
-  
-  # Add parameter names as row names if not already present
-  if (!"parameter" %in% names(mcmc_summary)) {
-    mcmc_summary$parameter <- rownames(mcmc_summary)
-  }
-  
-  # Reorder columns
-  col_order <- c("parameter", "mean", "sd", "2.5%", "50%", "97.5%", "Rhat", "n.eff")
-  available_cols <- intersect(col_order, names(mcmc_summary))
-  mcmc_summary <- mcmc_summary[, available_cols, drop = FALSE]
-  
-  return(mcmc_summary)
-}
-
-# Internal helper function (not exported)
-check_mcmc_convergence <- function(rhat_values, threshold = 1.1) {
-  
-  if (is.null(rhat_values) || length(rhat_values) == 0) {
-    return(list(
-      converged = FALSE,
-      n_converged = 0,
-      n_total = 0,
-      convergence_rate = 0,
-      problematic_params = character(0)
-    ))
-  }
-  
-  # Remove NAs
-  valid_rhat <- rhat_values[!is.na(rhat_values)]
-  
-  if (length(valid_rhat) == 0) {
-    return(list(
-      converged = FALSE,
-      n_converged = 0,
-      n_total = 0,
-      convergence_rate = 0,
-      problematic_params = character(0)
-    ))
-  }
-  
-  # Check convergence
-  converged_params <- valid_rhat < threshold
-  n_converged <- sum(converged_params)
-  n_total <- length(valid_rhat)
-  convergence_rate <- n_converged / n_total
-  
-  # Identify problematic parameters
-  problematic_params <- names(valid_rhat)[!converged_params]
-  if (is.null(problematic_params)) {
-    problematic_params <- which(!converged_params)
-  }
-  
-  overall_converged <- convergence_rate >= 0.95  # 95% of parameters must converge
-  
-  result <- list(
-    converged = overall_converged,
-    n_converged = n_converged,
-    n_total = n_total,
-    convergence_rate = convergence_rate,
-    problematic_params = problematic_params,
-    threshold = threshold
-  )
-  
-  return(result)
 }
 
 # Internal helper function (not exported)
@@ -126,44 +29,6 @@ get_group_labels <- function(include_numbers = TRUE) {
     return(c("Non-Learners", "Overgeneralizers", 
              "Physical Generalizers", "Perceptual Generalizers"))
   }
-}
-
-# Internal helper function (not exported)
-create_progress_bar <- function(current, total, width = 50) {
-  
-  if (total <= 0) return("")
-  
-  progress <- min(current / total, 1)
-  filled <- floor(progress * width)
-  empty <- width - filled
-  
-  bar <- paste0("[", 
-                paste(rep("=", filled), collapse = ""), 
-                paste(rep("-", empty), collapse = ""), 
-                "]")
-  
-  percentage <- round(progress * 100, 1)
-  
-  return(sprintf("%s %s%% (%d/%d)", bar, percentage, current, total))
-}
-
-# Internal helper function (not exported)
-safe_divide <- function(numerator, denominator, default_value = 0) {
-  ifelse(denominator == 0, default_value, numerator / denominator)
-}
-
-# Internal helper function (not exported)
-scale_to_range <- function(x, new_min = 0, new_max = 1) {
-  if (length(x) == 0) return(x)
-  
-  old_min <- min(x, na.rm = TRUE)
-  old_max <- max(x, na.rm = TRUE)
-  
-  if (old_min == old_max) {
-    return(rep(mean(c(new_min, new_max)), length(x)))
-  }
-  
-  (x - old_min) / (old_max - old_min) * (new_max - new_min) + new_min
 }
 
 #' Calculate Lambda Threshold
@@ -194,20 +59,27 @@ scale_to_range <- function(x, new_min = 0, new_max = 1) {
 calculate_lambda_threshold <- function(max_distance = NULL, criterion = 0.7, stimulus_range = NULL) {
   validate_scalar(criterion, "criterion", lower = 0, upper = 1,
                   lower_open = TRUE, upper_open = TRUE)
+  if (!is.null(stimulus_range) && !is.null(max_distance)) {
+    stop("Supply only one of max_distance or stimulus_range")
+  }
   if (!is.null(stimulus_range)) {
     validate_rating_scale(stimulus_range)
     max_distance <- diff(stimulus_range)
   }
   if (is.null(max_distance)) stop("Either max_distance or stimulus_range must be provided")
   validate_scalar(max_distance, "max_distance", lower = 0, lower_open = TRUE)
-  -log(criterion) / max_distance
+  threshold <- -log(criterion) / max_distance
+  if (!is.finite(threshold) || threshold <= 0) {
+    stop("The lambda threshold cannot be represented numerically; rescale stimulus distances")
+  }
+  threshold
 }
 
 #' Predict Group Membership
 #' 
 #' Predicts group membership for participants based on model fit
 #' 
-#' @param object An mfeargen object from fit_mfeargen
+#' @param object A fitted mfeargen or mfeargen_hierarchical model.
 #' @param threshold Numeric. Minimum posterior probability for assignment.
 #'   Participants below this threshold receive NA group labels (default: 0.5).
 #' @param ... Additional arguments (ignored)
@@ -225,7 +97,9 @@ calculate_lambda_threshold <- function(max_distance = NULL, criterion = 0.7, sti
 #' 
 #' @export
 predict_groups <- function(object, threshold = 0.5, ...) {
-  if (!inherits(object, "mfeargen")) stop("object must be of class 'mfeargen'")
+  if (!inherits(object, c("mfeargen", "mfeargen_hierarchical"))) {
+    stop("object must be a fitted mfeargen or mfeargen_hierarchical model")
+  }
   validate_scalar(threshold, "threshold", lower = 0, upper = 1)
   membership <- object$group_membership
   if (is.null(membership)) {
@@ -238,6 +112,11 @@ predict_groups <- function(object, threshold = 0.5, ...) {
     stop("Posterior group probabilities are unavailable; refit the model")
   }
   probabilities <- as.matrix(membership[probability_columns])
+  if (!is.numeric(probabilities) || !nrow(probabilities) ||
+      any(!is.finite(probabilities)) || any(probabilities < 0 | probabilities > 1) ||
+      any(abs(rowSums(probabilities) - 1) > 1e-8)) {
+    stop("Posterior group probabilities must be finite, non-negative, and sum to one")
+  }
   assignments <- max.col(probabilities, ties.method = "first")
   max_probability <- apply(probabilities, 1, max)
   labels <- c("Non-Learner", "Overgeneralizer", "Physical", "Perceptual")

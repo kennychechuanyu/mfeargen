@@ -2,15 +2,18 @@
 % Please edit documentation in R/06_s3_methods.R
 \name{print.mfeargen_recovery}
 \alias{print.mfeargen_recovery}
-\title{Print Method for Recovery Results}
+\title{Print Parameter Recovery Results}
 \usage{
 \method{print}{mfeargen_recovery}(x, ...)
 }
 \arguments{
-\item{x}{mfeargen_recovery object}
+\item{x}{An mfeargen_recovery object.}
 
-\item{...}{Additional arguments}
+\item{...}{Additional arguments (ignored).}
+}
+\value{
+The input, invisibly.
 }
 \description{
-Print Method for Recovery Results
+Print Parameter Recovery Results
 }
