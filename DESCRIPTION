@@ -1,8 +1,7 @@
 Package: mfeargen
 Type: Package
 Title: Bayesian Mixture Modeling for Fear Generalization Analysis
-Version: 1.0.0
-Date: 2025-11-09
+Version: 1.0.1
 Maintainer: Kenny Yu <kenny.yu@kuleuven.be>
 Authors@R: c(
     person("Kenny", "Yu",
@@ -19,36 +18,30 @@ Authors@R: c(
            role = "aut",
            comment = c(ORCID = "0000-0002-2218-3018"))
     )
-Description: Provides a comprehensive Bayesian framework for analyzing fear
-    generalization data using latent mixture models. The package implements
-    a two-phase experimental paradigm (conditioning and generalization) and
-    identifies four distinct learning patterns: Non-Learners, Overgeneralizers,
-    Physical Generalizers, and Perceptual Generalizers. Key features include
-    parameter recovery analysis, perceptual noise modeling, automatic scale
-    detection, and extensive visualization tools. Based on the computational
-    model described in Yu et al. (2023) <doi:10.1038/s44271-023-00005-0>.
-    The model incorporates Rescorla-Wagner learning, Shepard's similarity-based
-    generalization, and hierarchical Bayesian inference to capture individual
-    differences in fear learning mechanisms.
+Description: Fits Bayesian latent mixture models to trial-level fear
+    generalization data. Models combine Rescorla-Wagner learning with
+    similarity-based generalization to estimate learning rates, generalization
+    gradients, response parameters, and uncertainty in latent group membership.
+    Includes simulation, parameter recovery, convergence diagnostics, and
+    posterior summaries. Based on Yu et al. (2023)
+    <doi:10.1038/s44271-023-00005-0>.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.2
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
 Depends:
     R (>= 4.0.0)
 Imports:
     jagsUI (>= 1.5.0),
-    ggplot2 (>= 3.3.0),
-    dplyr,
+    ggplot2 (>= 3.4.0),
     stats,
     utils
 Suggests:
     rjags (>= 4.10),
-    coda (>= 0.19.0),
-    testthat (>= 3.0.0),
-    knitr,
-    rmarkdown,
-    viridis
+    testthat (>= 3.0.0)
 SystemRequirements: JAGS (>= 4.3.0)
-URL: https://osf.io/sxjak/
+Config/testthat/edition: 3
+URL: https://github.com/kennychechuanyu/mfeargen, https://osf.io/sxjak/
+BugReports: https://github.com/kennychechuanyu/mfeargen/issues
 Contact: Kenny Yu <kenny.yu@kuleuven.be>

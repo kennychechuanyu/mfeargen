@@ -1,148 +1,173 @@
 # mfeargen
 
-[![CRAN status](https://www.r-pkg.org/badges/version/mfeargen)](https://CRAN.R-project.org/package=mfeargen)
+[![R-CMD-check](https://github.com/kennychechuanyu/mfeargen/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/kennychechuanyu/mfeargen/actions/workflows/R-CMD-check.yaml)
 
-## Overview
+`mfeargen` fits Bayesian mixture models to trial-level fear generalization data.
+It combines Rescorla–Wagner learning with exponential similarity gradients and
+estimates posterior probabilities for four latent groups: non-learners,
+overgeneralizers, physical generalizers, and perceptual generalizers. Group
+membership is uncertain; use the posterior probabilities alongside assignments.
 
-**mfeargen** provides a comprehensive Bayesian framework for analyzing fear generalization data using latent mixture models. The package implements a two-phase experimental paradigm (conditioning and generalization) and identifies four distinct learning patterns in fear generalization behavior.
-
-Based on the computational model described in:
-> Yu, K., Tuerlinckx, F., Vanpaemel, W., & Zaman, J. (2023). Humans display interindividual differences in the latent mechanisms underlying fear generalization behaviour. *Communications Psychology*, 1, 5. https://doi.org/10.1038/s44271-023-00005-0
-
-## Features
-
-- **Rescorla-Wagner Learning**: Implements reinforcement learning during conditioning phase
-- **Shepard's Similarity Law**: Models stimulus generalization using exponential decay
-- **Four latent groups**: Automatically identifies Non-Learners, Overgeneralizers, Physical, and Perceptual Generalizers
-- **Hierarchical Bayesian Inference**: Full Bayesian treatment of individual and group parameters
-- **Parameter recovery**: Validate model performance with simulated data
-- **Perceptual noise modeling**: Control for individual differences in perception
-- **Automatic scale detection**: Works with any rating scale
-- **Comprehensive visualization**: Built-in plotting functions for all results
-- **Flexible prior specification**: Support for custom priors and prior templates
-- **1CS and 2CS paradigms**: Supports both single CS+ and differential CS+/CS- conditioning
+The model is based on [Yu et al. (2023), *Communications Psychology*](https://doi.org/10.1038/s44271-023-00005-0).
+The package also provides simulation, parameter recovery, posterior summaries,
+and diagnostic plots.
 
 ## Installation
 
-Install from GitHub:
+Use R 4.0 or later. Install [JAGS 4.3 or later](https://mcmc-jags.sourceforge.io/)
+before installing the package. On Debian or Ubuntu, install the `jags` system
+package; on macOS or Windows, use the JAGS installer appropriate for your R
+installation.
 
 ```r
-# install.packages("devtools")
-devtools::install_github("kennychechuanyu/mfeargen")
+install.packages("remotes")
+remotes::install_github("kennychechuanyu/mfeargen")
+
+library(mfeargen)
+rjags::jags.version()
 ```
 
-### System Requirements
+If `rjags` cannot load JAGS, check that R and JAGS use the same architecture and
+restart R after installing JAGS.
 
-- R (>= 4.0.0)
-- JAGS (>= 4.3.0) - [Download JAGS](https://sourceforge.net/projects/mcmc-jags/)
-
-## Quick Start
+## Simulate and fit a model
 
 ```r
 library(mfeargen)
 
-# 1. Simulate fear generalization data (1CS paradigm)
-data <- simulate_mfeargen(
-  n_participants = 50,
-  n_conditioning_trials = 24,      # Learning phase
-  n_generalization_trials = 160,   # Test phase
-  model_type = "1cs",              # Single CS+ (or "2cs" for CS+/CS-)
-  rating_scale = c(0, 100)
+simulated <- simulate_mfeargen(
+  n_participants = 12,
+  n_conditioning_trials = 24,
+  n_generalization_trials = 2,
+  model_type = "1cs",
+  rating_scale = c(0, 100),
+  seed = 42
 )
 
-# For 2CS paradigm (CS+ and CS-):
-# data <- simulate_mfeargen(
-#   model_type = "2cs",
-#   cs_plus = 7,
-#   cs_minus = 3,
-#   n_participants = 50
-# )
-
-# 2. Fit the Bayesian mixture model
 fit <- fit_mfeargen(
-  data = data,
-  model_type = "1cs",   # Must match simulation
-  n.iter = 10000,       # MCMC iterations
-  n.burnin = 5000,      # Burn-in period
-  n.chains = 3          # Parallel chains
+  simulated,
+  model_type = "1cs",
+  rating_scale = c(0, 100),
+  n.iter = 2000,
+  n.burnin = 1000,
+  n.chains = 3,
+  n.thin = 1,
+  parallel = FALSE,
+  seed = 42
 )
 
-# 3. Examine results
-summary(fit)          # Parameter estimates
-plot(fit)             # Visualization dashboard
-
-# 4. Extract group membership
-groups <- fit$group_membership
-table(groups$group_label)
+summary(fit)
+fit$convergence
+fit$group_membership
+plot_group_probabilities(fit)
+plot_generalization_gradient(fit)
+coef(fit)
+fitted(fit)
 ```
 
-## Advanced Usage
+`n_generalization_trials` is the number of trials **per stimulus**. With the
+default ten stimuli, the example creates 20 generalization trials per participant.
+`n_conditioning_trials` is the total conditioning trial count.
 
-### Custom Priors
+These short chains demonstrate the workflow. For inference, increase the number
+of retained samples and check convergence and mixing with
+`plot_mcmc_diagnostics(fit)`. A completed sampler run does not establish
+convergence or reliable group classification.
+
+For differential conditioning, simulate with `model_type = "2cs"`,
+`cs_plus = 7`, and `cs_minus = 3`, then fit with `model_type = "2cs"`. The
+standard `2cs` model represents one CS+ and one CS−. See
+`?replicate_paper_analysis` for reanalysis of the bundled study datasets. The
+current implementation is not a verified exact reproduction of the archived
+analysis.
+
+## Use your own data
+
+Supply a data frame with one row per presented stimulus trial. Keep the actual
+trial sequence and reinforcement outcomes, including trials with missing ratings.
+Remove inter-trial intervals before fitting.
+
+| Column | Meaning |
+| --- | --- |
+| `participant` | Participant ID; numeric or text |
+| `trials` | Positive integer trial order within each participant |
+| `US_expect` | Numeric expectancy rating; missing ratings may be `NA` |
+| `Phy_size` | Physical stimulus value |
+| `Per_size` | Measured perceptual stimulus value |
+| `stimulus_type` | `"CS+"`, `"CS-"`, or `"GS"` |
+| `US` | Actual outcome on each trial, `0` or `1`, for `1cs` |
+| `USp`, `USm` | `2cs` learning targets: CS+ uses `0`/`1`; CS− uses `-1` for inhibition, `0` off-cue, or `1` for reinforcement |
+| `phase` | Optional `"conditioning"` or `"generalization"` |
+
+When `phase` is supplied, learning updates occur during conditioning and
+associative strengths are held fixed during generalization. Without `phase`,
+CS trials update learning throughout the sequence. Participants may have
+different trial counts. Duplicate trial numbers within a participant are errors.
+Physical and perceptual values must be observed; the package does not invent
+perceptual measurements.
 
 ```r
-# Create custom priors using flexible specification
-custom_priors <- set_priors_flexible(
-  lambda_mu = prior_lognormal(meanlog = 0, sdlog = 0.5),
-  alpha_mu = prior_beta(shape1 = 1, shape2 = 1),
+trials <- read.csv("trials.csv")
+validate_mfeargen_data(trials, model_type = "1cs")
+fit <- fit_mfeargen(trials, model_type = "1cs", rating_scale = c(0, 100))
+```
+
+Specify the instrument's rating bounds with `rating_scale`. Inferring bounds
+from observed responses can distort the scale when participants do not use its
+full range. Simulated data retain their scale as metadata. Fitting uses a common
+internal rating scale, while fitted responses and residuals use the original
+scale.
+
+For precomputed distances and CS indicators, see `?prepare_mfeargen_data`.
+
+## Priors and model checks
+
+```r
+priors <- set_priors_flexible(
+  alpha_mu = prior_beta(shape1 = 2, shape2 = 2),
   pi = prior_dirichlet(alpha = c(1, 1, 1, 1))
 )
-fit <- fit_mfeargen(data, priors = custom_priors)
+fit_custom <- fit_mfeargen(
+  simulated,
+  priors = priors,
+  rating_scale = c(0, 100),
+  seed = 42
+)
 ```
 
-### Parameter Recovery Analysis
+Prior templates are starting points. Assess their implications on your stimulus
+units and rating scale, and check sensitivity to reasonable alternatives.
+`run_parameter_recovery()` can test whether an experimental design distinguishes
+the parameters and groups you want to interpret. Recovery requires repeated
+model fits and can take much longer than one analysis.
+
+The repeated-session hierarchical model currently supports `1cs` data with an
+additional `session` column. It estimates stable individual components and
+session variation. It does not support custom priors or `2cs` designs; these
+requests produce an explicit error.
+
+## Development
 
 ```r
-# Validate model performance
-recovery <- run_parameter_recovery(
-  n_participants = 30,
-  n_simulations = 10,
-  model_type = "1cs"
-)
-
-# Visualize recovery quality
-plot_parameter_recovery(recovery)
-
-# Check recovery metrics
-print(recovery)  # Shows correlations and accuracy
+install.packages(c("devtools", "roxygen2", "testthat"))
+devtools::test()
+devtools::check(args = "--no-manual")
 ```
 
-## Citation
+The test suite includes short JAGS runs for both conditioning designs. These
+check installation and model execution; they are not parameter recovery studies.
+CI runs the package check with JAGS on the release and previous-release versions
+of R.
 
-If you use mfeargen in your research, please cite:
+## Citation and data
 
-```bibtex
-@article{yu2023humans,
-  title={Humans display interindividual differences in the latent mechanisms underlying fear generalization behaviour},
-  author={Yu, Kenny and Tuerlinckx, Francis and Vanpaemel, Wolf and Zaman, Jonas},
-  journal={Communications Psychology},
-  volume={1},
-  pages={5},
-  year={2023},
-  doi={10.1038/s44271-023-00005-0}
-}
-```
+Use `citation("mfeargen")` for the package and model citations.
+Original study materials and data are available at [OSF](https://osf.io/sxjak/).
+Bundled datasets are documented in `?exp1_data` and `?exp2_data`.
 
-## Acknowledgments
-
-This work was supported by:
-- FWO Research Project (G079520N)
-- Research Foundation Flanders (FWO) Postdoctoral Fellowship (12P8623N)
-- Special Research Funds (FWO, 1500620N)
-- Research Fund of KU Leuven (C14/19/054)
-- Flemish Supercomputer Center (VSC)
-
-## Data and Code Availability
-
-- **Original Paper Data & Code**: https://osf.io/sxjak/
-- **Experiment 1 Pre-registration**: https://osf.io/b4ngs
-- **Experiment 2 Pre-registration**: https://osf.io/t4bzs
-
-## Getting Help
-
-- **Documentation**: See package documentation with `help(package = "mfeargen")`
-- **Contact**: kenny.yu@kuleuven.be
+Report bugs with a reproducible example in the
+[issue tracker](https://github.com/kennychechuanyu/mfeargen/issues).
 
 ## License
 
-MIT © 2023-2024 Kenny Yu, Francis Tuerlinckx, Wolf Vanpaemel, Jonas Zaman
+MIT. See [LICENSE](LICENSE) for copyright holders.

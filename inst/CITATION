@@ -32,12 +32,12 @@ bibentry(
     person("Wolf", "Vanpaemel"),
     person("Jonas", "Zaman")
   ),
-  year     = "2024",
-  note     = "R package version 1.0.0",
-  url      = "https://osf.io/sxjak/",
+  year     = "2026",
+  note     = "R package version 1.0.1",
+  url      = "https://github.com/kennychechuanyu/mfeargen",
   textVersion = paste(
-    "Yu, K., Tuerlinckx, F., Vanpaemel, W., & Zaman, J. (2024).",
+    "Yu, K., Tuerlinckx, F., Vanpaemel, W., & Zaman, J. (2026).",
     "mfeargen: Bayesian Mixture Modeling for Fear Generalization Analysis.",
-    "R package version 1.0.0."
+    "R package version 1.0.1."
   )
 )
